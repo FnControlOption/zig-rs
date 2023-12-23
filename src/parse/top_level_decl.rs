@@ -1,6 +1,6 @@
 use super::*;
 
-impl<'src, 'tok> Parser<'src, 'tok> {
+impl Parser<'_, '_> {
     pub(super) fn expect_top_level_decl(&mut self) -> Result<node::Index> {
         let extern_export_inline_token = self.next_token();
         let mut is_extern = false;

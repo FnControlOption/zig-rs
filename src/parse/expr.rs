@@ -1,6 +1,9 @@
 use super::*;
 
-impl<'src, 'tok> Parser<'src, 'tok> {
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
+impl Parser<'_, '_> {
     pub(super) fn parse_expr(&mut self) -> Result<node::Index> {
         self.parse_expr_precedence(0)
     }

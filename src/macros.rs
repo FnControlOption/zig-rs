@@ -1,23 +1,21 @@
-macro_rules! token {
+macro_rules! error {
     ($tag:ident) => {
-        token::Tag::$tag
+        crate::ast::error::Tag::$tag
     };
 }
-
-pub(crate) use token;
 
 macro_rules! node {
     ($tag:ident) => {
-        node::Tag::$tag
+        crate::ast::node::Tag::$tag
     };
 }
 
-pub(crate) use node;
-
-macro_rules! error {
+macro_rules! token {
     ($tag:ident) => {
-        error::Tag::$tag
+        crate::token::Tag::$tag
     };
 }
 
 pub(crate) use error;
+pub(crate) use node;
+pub(crate) use token;

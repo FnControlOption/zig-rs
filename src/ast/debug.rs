@@ -1,4 +1,7 @@
+use super::node::ExtraData;
 use super::*;
+
+use crate::macros::node;
 
 impl<'src> std::fmt::Debug for Ast<'src> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

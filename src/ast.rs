@@ -1,9 +1,6 @@
-use crate::macros::node;
 use crate::parse::Parser;
 use crate::token;
 use crate::Tokenizer;
-
-use self::node::ExtraData;
 
 #[cfg(test)]
 mod tests;

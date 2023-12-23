@@ -21,7 +21,7 @@ impl Members {
     }
 }
 
-impl<'src, 'tok> Parser<'src, 'tok> {
+impl Parser<'_, '_> {
     pub(super) fn parse_container_members(&mut self) -> Members {
         let mut items = Vec::new();
 

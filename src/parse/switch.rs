@@ -1,6 +1,6 @@
 use super::*;
 
-impl<'src, 'tok> Parser<'src, 'tok> {
+impl Parser<'_, '_> {
     pub(super) fn expect_switch_expr(&mut self) -> Result<node::Index> {
         todo!("expect_switch_expr")
     }

@@ -1,6 +1,6 @@
 use super::*;
 
-impl<'src, 'tok> Parser<'src, 'tok> {
+impl Parser<'_, '_> {
     pub(super) fn parse_fn_proto(&mut self) -> Result<node::Index> {
         let Some(fn_token) = self.eat_token(token!(KeywordFn)) else {
             return Ok(NULL_NODE);

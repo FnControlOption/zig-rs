@@ -1,6 +1,6 @@
 use super::*;
 
-impl<'src, 'tok> Parser<'src, 'tok> {
+impl Parser<'_, '_> {
     pub(super) fn parse_var_decl_proto(&mut self) -> Result<node::Index> {
         let Some(mut_token) = self
             .eat_token(token!(KeywordConst))

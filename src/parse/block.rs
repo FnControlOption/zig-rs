@@ -1,6 +1,6 @@
 use super::*;
 
-impl<'src, 'tok> Parser<'src, 'tok> {
+impl Parser<'_, '_> {
     pub(super) fn parse_block_expr_statement(&mut self) -> Result<node::Index> {
         todo!("parse_block_expr_statement")
     }

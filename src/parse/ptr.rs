@@ -4,7 +4,7 @@ pub struct PtrModifiers {
     // TODO
 }
 
-impl<'src, 'tok> Parser<'src, 'tok> {
+impl Parser<'_, '_> {
     pub(super) fn parse_ptr_payload(&mut self) -> Result<TokenIndex> {
         todo!("parse_ptr_payload")
     }

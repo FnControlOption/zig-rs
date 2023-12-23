@@ -1,8 +1,3 @@
-use std::cell::OnceCell;
-use std::collections::HashMap;
-use std::process::exit;
-use std::sync::OnceLock;
-
 use crate::ast;
 use crate::ast::{error, node, Error, Node, TokenIndex};
 use crate::macros::*;
@@ -19,6 +14,7 @@ mod r#fn;
 mod r#for;
 mod r#if;
 mod ptr;
+mod statement;
 mod switch;
 mod top_level_decl;
 mod type_expr;
@@ -44,7 +40,7 @@ pub struct Parser<'src, 'tok> {
     pub extra_data: Vec<node::Index>,
 }
 
-impl<'src, 'tok> Parser<'src, 'tok> {
+impl Parser<'_, '_> {
     fn token_tag(&self, index: TokenIndex) -> token::Tag {
         self.token_tags[index as usize]
     }
@@ -108,7 +104,7 @@ macro_rules! eat_token {
 
 pub(crate) use eat_token;
 
-impl<'src, 'tok> Parser<'src, 'tok> {
+impl Parser<'_, '_> {
     fn list_to_span(&mut self, list: &[node::Index]) -> node::SubRange {
         self.extra_data.extend_from_slice(list);
         node::SubRange {

@@ -1,6 +1,6 @@
 use super::*;
 
-impl<'src, 'tok> Parser<'src, 'tok> {
+impl Parser<'_, '_> {
     pub(super) fn parse_type_expr(&mut self) -> Result<node::Index> {
         match self.token_tag(self.tok_i) {
             token!(QuestionMark)
