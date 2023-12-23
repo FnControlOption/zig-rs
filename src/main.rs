@@ -14,7 +14,9 @@ pub use ast::Ast;
 mod parse;
 
 fn main() {
-    let source = "const Foo = struct {};";
+    // let source = r#"const _ = {};"#;
+    let source = r#"const _ = foo(a, b, c);"#;
+    // let source = r#"test "foo" {}"#;
     let tree = Ast::parse(source.as_bytes(), ast::Mode::Zig);
     for error in tree.errors.iter() {
         println!("{:?}", error.tag);
