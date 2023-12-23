@@ -1,16 +1,5 @@
 use super::*;
-
-macro_rules! token {
-    ($tag:ident) => {
-        token::Tag::$tag
-    };
-}
-
-macro_rules! node {
-    ($tag:ident) => {
-        node::Tag::$tag
-    };
-}
+use crate::macros::{node, token};
 
 macro_rules! assert_node {
     ($tree:ident, $index:expr, $tag:ident) => {{
