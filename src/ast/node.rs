@@ -500,12 +500,12 @@ pub trait ExtraData<const N: usize>: Sized {
 }
 
 macro_rules! extra_data {
-    ($name:ident, $size:literal, $($(#[$attr:meta])* $field:ident: $type:ident),* $(,)?) => {
-        pub struct $name {
-            $($(#[$attr])* pub $field: $type),*
+    ($type:ident, $size:literal, $($(#[$attr:meta])* $field:ident: $field_type:ident),* $(,)?) => {
+        pub struct $type {
+            $($(#[$attr])* pub $field: $field_type),*
         }
 
-        impl ExtraData<$size> for $name {
+        impl ExtraData<$size> for $type {
             fn to_array(&self) -> [Index; $size] {
                 [$(self.$field),*]
             }
@@ -517,7 +517,7 @@ macro_rules! extra_data {
             }
         }
 
-        crate::ast::debug::extra_data_impl!($name, $($field),*);
+        crate::ast::debug::extra_data_impl!($type, $($field),*);
     };
 }
 

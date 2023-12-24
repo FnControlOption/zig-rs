@@ -5,21 +5,15 @@ use crate::macros::node;
 
 const DUMP_UNUSED_DATA: bool = false;
 
-// enum ExtraDataType {}
-
 enum DataType {
     Unknown,
 
     Unused,
     Node,
     Token,
-    ElemCount,
+    NodeSlice,
 
-    GlobalVarDecl,
-    LocalVarDecl,
-    ArrayTypeSentinel,
-    SubRange,
-    PtrType,
+    Extra(ExtraDataType),
 }
 
 enum PairType {
@@ -34,18 +28,24 @@ macro_rules! data {
     ($lhs:ident, $rhs:ident) => {
         PairType::Pair(DataType::$lhs, DataType::$rhs)
     };
+    (extra!($lhs:ident), $rhs:ident) => {
+        PairType::Pair(DataType::Extra(ExtraDataType::$lhs), DataType::$rhs)
+    };
+    ($lhs:ident, extra!($rhs:ident)) => {
+        PairType::Pair(DataType::$lhs, DataType::Extra(ExtraDataType::$rhs))
+    };
 }
 
-fn data_types_of(mode: Mode, node_tag: node::Tag) -> PairType {
-    match node_tag {
+fn data_types_of(mode: Mode, tag: node::Tag) -> PairType {
+    match tag {
         node!(Root) => match mode {
             Mode::Zig => data!(SubList),
             Mode::Zon => data!(Node, Unused),
         },
         node!(Usingnamespace) => data!(Node, Unused),
         node!(TestDecl) => data!(Token, Node),
-        node!(GlobalVarDecl) => data!(GlobalVarDecl, Node),
-        node!(LocalVarDecl) => data!(LocalVarDecl, Node),
+        node!(GlobalVarDecl) => data!(extra!(GlobalVarDecl), Node),
+        node!(LocalVarDecl) => data!(extra!(LocalVarDecl), Node),
         node!(SimpleVarDecl) => data!(Node, Node),
         node!(AlignedVarDecl) => data!(Node, Node),
         node!(Errdefer) => data!(Token, Node),
@@ -77,7 +77,7 @@ fn data_types_of(mode: Mode, node_tag: node::Tag) -> PairType {
         node!(AssignAddSat) => data!(Node, Node),
         node!(AssignSubSat) => data!(Node, Node),
         node!(Assign) => data!(Node, Node),
-        node!(AssignDestructure) => data!(ElemCount, Node),
+        node!(AssignDestructure) => data!(NodeSlice, Node),
         node!(MergeErrorSets) => data!(Node, Node),
         node!(Mul) => data!(Node, Node),
         node!(Div) => data!(Node, Node),
@@ -110,14 +110,14 @@ fn data_types_of(mode: Mode, node_tag: node::Tag) -> PairType {
         node!(Await) => data!(Node, Unused),
         node!(OptionalType) => data!(Node, Unused),
         node!(ArrayType) => data!(Node, Node),
-        node!(ArrayTypeSentinel) => data!(Node, ArrayTypeSentinel),
+        node!(ArrayTypeSentinel) => data!(Node, extra!(ArrayTypeSentinel)),
         node!(PtrTypeAligned) => data!(Node, Node),
         node!(PtrTypeSentinel) => data!(Node, Node),
-        node!(PtrType) => data!(PtrType, Node),
-        // node!(PtrTypeBitRange) => data!(PtrTypeBitRange, Node),
+        node!(PtrType) => data!(extra!(PtrType), Node),
+        // node!(PtrTypeBitRange) => data!(extra!(PtrTypeBitRange), Node),
         node!(SliceOpen) => data!(Node, Node),
-        // node!(Slice) => data!(Node, Slice),
-        // node!(SliceSentinel) => data!(Node, SliceSentinel),
+        // node!(Slice) => data!(Node, extra!(Slice)),
+        // node!(SliceSentinel) => data!(Node, extra!(SliceSentinel)),
         node!(Deref) => data!(Node, Unused),
         node!(ArrayAccess) => data!(Node, Node),
         node!(ArrayInitOne) => data!(Node, Node),
@@ -140,19 +140,19 @@ fn data_types_of(mode: Mode, node_tag: node::Tag) -> PairType {
         node!(CallOneComma) => data!(Node, Node),
         node!(AsyncCallOne) => data!(Node, Node),
         node!(AsyncCallOneComma) => data!(Node, Node),
-        node!(Call) => data!(Node, SubRange),
-        node!(CallComma) => data!(Node, SubRange),
-        node!(AsyncCall) => data!(Node, SubRange),
-        node!(AsyncCallComma) => data!(Node, SubRange),
-        // node!(Switch) => data!(Node, SubRange),
+        node!(Call) => data!(Node, extra!(SubRange)),
+        node!(CallComma) => data!(Node, extra!(SubRange)),
+        node!(AsyncCall) => data!(Node, extra!(SubRange)),
+        node!(AsyncCallComma) => data!(Node, extra!(SubRange)),
+        // node!(Switch) => data!(Node, extra!(SubRange)),
         node!(SwitchCaseOne) => data!(Node, Node),
         node!(SwitchCaseInlineOne) => data!(Node, Node),
-        // node!(SwitchCase) => data!(SubRange, Node),
-        // node!(SwitchCaseInline) => data!(SubRange, Node),
+        // node!(SwitchCase) => data!(extra!(SubRange), Node),
+        // node!(SwitchCaseInline) => data!(extra!(SubRange), Node),
         node!(SwitchRange) => data!(Node, Node),
         node!(WhileSimple) => data!(Node, Node),
-        // node!(WhileCont) => data!(Node, WhileCont),
-        // node!(While) => data!(Node, While),
+        // node!(WhileCont) => data!(Node, extra!(WhileCont)),
+        // node!(While) => data!(Node, extra!(While)),
         node!(ForSimple) => data!(Node, Node),
         // node!(For) => data!(Unknown, Unknown),
         node!(ForRange) => data!(Node, Node),
@@ -163,9 +163,9 @@ fn data_types_of(mode: Mode, node_tag: node::Tag) -> PairType {
         // node!(Break) => data!(Unknown, Node),
         node!(Return) => data!(Node, Unused),
         node!(FnProtoSimple) => data!(Node, Node),
-        node!(FnProtoMulti) => data!(SubRange, Node),
-        // node!(FnProtoOne) => data!(FnProtoOne, Node),
-        // node!(FnProto) => data!(FnProto, Node),
+        node!(FnProtoMulti) => data!(extra!(SubRange), Node),
+        node!(FnProtoOne) => data!(extra!(FnProtoOne), Node),
+        node!(FnProto) => data!(extra!(FnProto), Node),
         node!(FnDecl) => data!(Node, Node),
         // node!(AnyframeType) => data!(Token, Node),
         node!(AnyframeLiteral) => data!(Unused, Unused),
@@ -185,14 +185,14 @@ fn data_types_of(mode: Mode, node_tag: node::Tag) -> PairType {
         // node!(ContainerDeclTrailing) => data!(Unknown, Unknown),
         node!(ContainerDeclTwo) => data!(Node, Node),
         node!(ContainerDeclTwoTrailing) => data!(Node, Node),
-        // node!(ContainerDeclArg) => data!(Node, SubRange),
-        // node!(ContainerDeclArgTrailing) => data!(Node, SubRange),
+        // node!(ContainerDeclArg) => data!(Node, extra!(SubRange)),
+        // node!(ContainerDeclArgTrailing) => data!(Node, extra!(SubRange)),
         node!(TaggedUnion) => data!(SubList),
         node!(TaggedUnionTrailing) => data!(SubList),
         node!(TaggedUnionTwo) => data!(Node, Node),
         node!(TaggedUnionTwoTrailing) => data!(Node, Node),
-        // node!(TaggedUnionEnumTag) => data!(Node, SubRange),
-        // node!(TaggedUnionEnumTagTrailing) => data!(Node, SubRange),
+        // node!(TaggedUnionEnumTag) => data!(Node, extra!(SubRange)),
+        // node!(TaggedUnionEnumTagTrailing) => data!(Node, extra!(SubRange)),
         node!(ContainerFieldInit) => data!(Node, Node),
         // node!(ContainerFieldAlign) => data!(Node, Node),
         // node!(ContainerField) => data!(Node, Node),
@@ -203,7 +203,7 @@ fn data_types_of(mode: Mode, node_tag: node::Tag) -> PairType {
         node!(Block) => data!(SubList),
         node!(BlockSemicolon) => data!(SubList),
         // node!(AsmSimple) => data!(Unknown, Token),
-        // node!(Asm) => data!(Unknown, Asm),
+        // node!(Asm) => data!(Unknown, extra!(Asm)),
         // node!(AsmOutput) => data!(Unknown, Token),
         // node!(AsmInput) => data!(Unknown, Token),
         node!(ErrorValue) => data!(Token, Token),
@@ -218,18 +218,13 @@ impl std::fmt::Debug for Ast<'_> {
     }
 }
 
-macro_rules! indent {
-    ($f:ident, $depth:expr, $($arg:tt)*) => {{
-        let indent = " ".repeat($depth * 2);
-        write!($f, "{indent}")?;
-        writeln!($f, $($arg)*)
-    }};
+fn indent(depth: usize) -> String {
+    " ".repeat(depth * 2)
 }
 
-macro_rules! header {
+macro_rules! dump_header {
     ($f:ident, $depth:expr, $name:expr, $origin:expr, $($arg:tt)*) => {{
-        let indent = " ".repeat($depth * 2);
-        write!($f, "{indent}")?;
+        write!($f, "{}", indent($depth))?;
         if let Some(name) = $name {
             write!($f, "{name}: ")?;
         }
@@ -239,92 +234,12 @@ macro_rules! header {
         writeln!($f, $($arg)*)
     }};
     ($f:ident, $depth:expr, $name:expr, $($arg:tt)*) => {
-        header!($f, $depth, $name, None::<()>, $($arg)*)
+        dump_header!($f, $depth, $name, None::<()>, $($arg)*)
     };
 }
 
-pub(crate) use header;
-
 impl Ast<'_> {
-    /// For debugging purposes.
-    pub fn dump(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        node: &Node,
-        depth: usize,
-    ) -> std::fmt::Result {
-        let mode = self.mode;
-        let node_tag = node.tag;
-        let node::Data { lhs, rhs } = node.data;
-        let main_token = node.main_token;
-        let main_token_tag = self.token_tag(main_token);
-        let main_token_start = self.token_start(main_token);
-
-        if node_tag == node!(Root) {
-            indent!(f, depth, "{node_tag:?} ({mode:?})")?;
-        } else {
-            indent!(
-                f,
-                depth,
-                "{node_tag:?} @ source[{main_token_start}] / {main_token_tag:?}"
-            )?;
-        }
-
-        let pair_type = data_types_of(mode, node_tag);
-        let (lhs_type, rhs_type) = match pair_type {
-            PairType::SubList => return self.dump_node_list(f, depth, None, None::<()>, lhs..rhs),
-            PairType::Pair(l, r) => (l, r),
-        };
-
-        for (name, data, data_type) in [("lhs", lhs, lhs_type), ("rhs", rhs, rhs_type)] {
-            match data_type {
-                DataType::Unknown => header!(f, depth, Some(name), "? / {data}")?,
-                DataType::Unused => {
-                    if DUMP_UNUSED_DATA {
-                        header!(f, depth, Some(name), "unused / {data}")?;
-                    }
-                }
-                DataType::Node => self.dump_node_at(f, depth, Some(name), None, data)?,
-                DataType::Token => self.dump_token_at(f, depth, Some(name), None, data)?,
-                DataType::ElemCount => {
-                    let count = self.extra_data(data);
-                    let start = data + 1;
-                    let end = start + count;
-                    self.dump_node_list(f, depth, Some(name), Some(data), start..end)?;
-                }
-                DataType::GlobalVarDecl => {
-                    let origin = node::GlobalVarDecl::field_range(data);
-                    let decl = node::GlobalVarDecl::from_start(self, data);
-                    decl.dump_as_nodes(self, f, depth, Some(name), Some(origin), data)?;
-                }
-                DataType::LocalVarDecl => {
-                    let origin = node::LocalVarDecl::field_range(data);
-                    let decl = node::LocalVarDecl::from_start(self, data);
-                    decl.dump_as_nodes(self, f, depth, Some(name), Some(origin), data)?;
-                }
-                DataType::ArrayTypeSentinel => {
-                    let origin = node::ArrayTypeSentinel::field_range(data);
-                    let decl = node::ArrayTypeSentinel::from_start(self, data);
-                    decl.dump_as_nodes(self, f, depth, Some(name), Some(origin), data)?;
-                }
-                DataType::PtrType => {
-                    let origin = node::PtrType::field_range(data);
-                    let decl = node::PtrType::from_start(self, data);
-                    decl.dump_as_nodes(self, f, depth, Some(name), Some(origin), data)?;
-                }
-                DataType::SubRange => {
-                    let origin = node::SubRange::field_range(data);
-                    let range = node::SubRange::from_start(self, data);
-                    let node::SubRange { start, end } = range;
-                    self.dump_node_list(f, depth, Some(name), Some(origin), start..end)?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn dump_token_at(
+    pub fn dump_token(
         &self,
         f: &mut std::fmt::Formatter<'_>,
         depth: usize,
@@ -333,11 +248,11 @@ impl Ast<'_> {
         index: TokenIndex,
     ) -> std::fmt::Result {
         if index == 0 {
-            header!(f, depth, name, origin, "omitted token")
+            dump_header!(f, depth, name, origin, "omitted token")
         } else {
             let token_tag = self.token_tag(index);
             let token_start = self.token_start(index);
-            header!(
+            dump_header!(
                 f,
                 depth,
                 name,
@@ -347,7 +262,7 @@ impl Ast<'_> {
         }
     }
 
-    pub fn dump_node_at(
+    pub fn dump_child(
         &self,
         f: &mut std::fmt::Formatter<'_>,
         depth: usize,
@@ -356,14 +271,14 @@ impl Ast<'_> {
         index: node::Index,
     ) -> std::fmt::Result {
         if index == 0 {
-            header!(f, depth, name, origin, "omitted node")
+            dump_header!(f, depth, name, origin, "omitted node")
         } else {
-            header!(f, depth, name, origin, "node[{index}]")?;
+            dump_header!(f, depth, name, origin, "node[{index}]")?;
             self.dump(f, self.node(index), depth + 1)
         }
     }
 
-    pub fn dump_node_list(
+    pub fn dump_children(
         &self,
         f: &mut std::fmt::Formatter<'_>,
         depth: usize,
@@ -371,33 +286,176 @@ impl Ast<'_> {
         origin: Option<impl std::fmt::Debug>,
         range: std::ops::Range<node::Index>,
     ) -> std::fmt::Result {
-        header!(f, depth, name, origin, "extra[{range:?}]")?;
+        dump_header!(f, depth, name, origin, "extra[{range:?}]")?;
         for extra_index in range {
             let node_index = self.extra_data(extra_index);
-            self.dump_node_at(f, depth, None, Some(extra_index), node_index)?;
+            self.dump_child(f, depth, None, Some(extra_index), node_index)?;
         }
+        Ok(())
+    }
+
+    pub fn dump(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        node: &Node,
+        depth: usize,
+    ) -> std::fmt::Result {
+        let mode = self.mode;
+
+        let Node {
+            tag,
+            main_token,
+            data: node::Data { lhs, rhs },
+        } = *node;
+
+        write!(f, "{}", indent(depth))?;
+        if tag == node!(Root) {
+            writeln!(f, "{tag:?} ({mode:?})")?;
+        } else {
+            let token_tag = self.token_tag(main_token);
+            let token_start = self.token_start(main_token);
+            writeln!(f, "{tag:?} @ source[{token_start}] / {token_tag:?}")?;
+        }
+
+        let pair_type = data_types_of(mode, tag);
+        let (lhs_type, rhs_type) = match pair_type {
+            PairType::SubList => return self.dump_children(f, depth, None, None::<()>, lhs..rhs),
+            PairType::Pair(l, r) => (l, r),
+        };
+
+        for (name, data, data_type) in [("lhs", lhs, lhs_type), ("rhs", rhs, rhs_type)] {
+            match data_type {
+                DataType::Unknown => dump_header!(f, depth, Some(name), "? / {data}")?,
+                DataType::Unused => {
+                    if DUMP_UNUSED_DATA {
+                        dump_header!(f, depth, Some(name), "unused / {data}")?;
+                    }
+                }
+                DataType::Node => self.dump_child(f, depth, Some(name), None, data)?,
+                DataType::Token => self.dump_token(f, depth, Some(name), None, data)?,
+                DataType::NodeSlice => {
+                    let count = self.extra_data(data);
+                    let start = data + 1;
+                    let end = start + count;
+                    self.dump_children(f, depth, Some(name), Some(data), start..end)?;
+                }
+                DataType::Extra(extra_data_type) => {
+                    extra_data_type.dump_extra_data(self, f, depth, Some(name), data)?;
+                }
+            }
+        }
+
         Ok(())
     }
 }
 
+impl node::SubRange {
+    pub fn dump_data(
+        &self,
+        tree: &Ast,
+        f: &mut std::fmt::Formatter<'_>,
+        depth: usize,
+        name: Option<&str>,
+        start: node::Index,
+    ) -> std::fmt::Result {
+        let origin = Self::field_range(start);
+        let range = self.start..self.end;
+        tree.dump_children(f, depth, name, Some(origin), range)
+    }
+}
+
+impl node::FnProto {
+    pub fn dump_data(
+        &self,
+        tree: &Ast,
+        f: &mut std::fmt::Formatter<'_>,
+        depth: usize,
+        name: Option<&str>,
+        start: node::Index,
+    ) -> std::fmt::Result {
+        let origin = Self::field_range(start);
+        dump_header!(f, depth, name, Some(origin), "FnProto")?;
+
+        let node::FnProto {
+            params_start,
+            params_end,
+            align_expr,
+            addrspace_expr,
+            section_expr,
+            callconv_expr,
+        } = *self;
+
+        {
+            let name = "params";
+            let origin = start + 0..start + 2;
+            let range = params_start..params_end;
+            tree.dump_children(f, depth, Some(name), Some(origin), range)?;
+        }
+
+        for (name, origin, index) in [
+            ("align_expr", start + 2, align_expr),
+            ("addrspace_expr", start + 3, addrspace_expr),
+            ("section_expr", start + 4, section_expr),
+            ("callconv_expr", start + 5, callconv_expr),
+        ] {
+            tree.dump_child(f, depth, Some(name), Some(origin), index)?;
+        }
+
+        Ok(())
+    }
+}
+
+macro_rules! extra_data_all_nodes {
+    ($type:ident) => {
+        impl node::$type {
+            pub fn dump_data(
+                &self,
+                tree: &Ast,
+                f: &mut std::fmt::Formatter<'_>,
+                depth: usize,
+                name: Option<&str>,
+                start: node::Index,
+            ) -> std::fmt::Result {
+                let origin = Self::field_range(start);
+                dump_header!(f, depth, name, Some(origin), stringify!($type))?;
+                self.dump_fields_as_nodes(tree, f, depth, start)
+            }
+        }
+    };
+}
+
+macro_rules! extra_data_todo {
+    ($type:ident) => {
+        impl node::$type {
+            pub fn dump_data(
+                &self,
+                tree: &Ast,
+                f: &mut std::fmt::Formatter<'_>,
+                depth: usize,
+                name: Option<&str>,
+                start: node::Index,
+            ) -> std::fmt::Result {
+                todo!(concat!(stringify!($type), "::dump_data"))
+            }
+        }
+    };
+}
+
 macro_rules! extra_data_impl {
-    ($name:ident, $($field:ident),*) => {
-        impl $name {
-            pub fn dump_as_nodes(
+    ($type:ident, $($field:ident),*) => {
+        impl crate::ast::node::$type {
+            pub fn dump_fields_as_nodes(
                 &self,
                 tree: &crate::Ast,
                 f: &mut std::fmt::Formatter<'_>,
                 depth: usize,
-                name: Option<&str>,
-                origin: Option<std::ops::Range<usize>>,
-                start_index: crate::ast::node::Index,
+                start: crate::ast::node::Index,
             ) -> std::fmt::Result {
-                crate::ast::debug::header!(f, depth, name, origin, "{}", stringify!($name))?;
                 let Self { $($field),* } = *self;
-                let mut extra_index = start_index;
+                let mut origin = start;
                 $(
-                    tree.dump_node_at(f, depth, Some(stringify!($field)), Some(extra_index), $field)?;
-                    extra_index += 1;
+                    tree.dump_child(f, depth, Some(stringify!($field)), Some(origin), $field)?;
+                    origin += 1;
                 )*
                 Ok(())
             }
@@ -406,3 +464,67 @@ macro_rules! extra_data_impl {
 }
 
 pub(crate) use extra_data_impl;
+
+macro_rules! extra_data_types {
+    ($($type:ident,)*) => {
+        enum ExtraDataType {
+            $($type),*
+        }
+
+        impl ExtraDataType {
+            fn dump_extra_data(
+                &self,
+                tree: &crate::Ast,
+                f: &mut std::fmt::Formatter<'_>,
+                depth: usize,
+                name: Option<&str>,
+                start: crate::ast::node::Index,
+            ) -> std::fmt::Result {
+                match self {
+                    $(
+                        ExtraDataType::$type => {
+                            let data = node::$type::from_start(tree, start);
+                            data.dump_data(tree, f, depth, name, start)
+                        }
+                    )*
+                }
+            }
+        }
+    };
+}
+
+extra_data_types! {
+    LocalVarDecl,
+    ArrayTypeSentinel,
+    PtrType,
+    PtrTypeBitRange,
+    SubRange,
+    If,
+    ContainerField,
+    GlobalVarDecl,
+    Slice,
+    SliceSentinel,
+    While,
+    WhileCont,
+    For,
+    FnProtoOne,
+    FnProto,
+    Asm,
+}
+
+extra_data_all_nodes!(LocalVarDecl);
+extra_data_all_nodes!(ArrayTypeSentinel);
+extra_data_all_nodes!(PtrType);
+extra_data_all_nodes!(PtrTypeBitRange);
+// extra_data_todo!(SubRange);
+extra_data_all_nodes!(If);
+extra_data_all_nodes!(ContainerField);
+extra_data_all_nodes!(GlobalVarDecl);
+extra_data_all_nodes!(Slice);
+extra_data_all_nodes!(SliceSentinel);
+extra_data_all_nodes!(While);
+extra_data_all_nodes!(WhileCont);
+extra_data_all_nodes!(For);
+extra_data_all_nodes!(FnProtoOne);
+// extra_data_todo!(FnProto);
+extra_data_todo!(Asm);

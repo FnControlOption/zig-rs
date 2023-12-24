@@ -28,7 +28,7 @@ impl Parser<'_, '_> {
             self.warn(error!(ExpectedReturnType));
         }
 
-        if align_expr == 0 && section_expr == 0 && callconv_expr == 0 {
+        if align_expr == 0 && section_expr == 0 && callconv_expr == 0 && addrspace_expr == 0 {
             *self.node_mut(fn_proto) = match params {
                 SmallSpan::ZeroOrOne(param) => Node {
                     tag: node!(FnProtoSimple),
@@ -71,7 +71,6 @@ impl Parser<'_, '_> {
                 }
             }
             SmallSpan::Multi(span) => {
-                // TODO: impl ExtraData for node::FnProto
                 let lhs = self.add_extra(node::FnProto {
                     params_start: span.start,
                     params_end: span.end,
