@@ -67,8 +67,8 @@ impl Parser<'_, '_> {
                         tag: Identifier,
                         main_token: main_token,
                         data: {
-                            lhs: UNDEFINED_TOKEN,
-                            rhs: UNDEFINED_TOKEN,
+                            lhs: UNDEFINED_NODE,
+                            rhs: UNDEFINED_NODE,
                         }
                     });
                 }
@@ -171,7 +171,7 @@ impl Parser<'_, '_> {
                         tag: ErrorSetDecl,
                         main_token: error_token,
                         data: {
-                            lhs: UNDEFINED_TOKEN,
+                            lhs: UNDEFINED_NODE,
                             rhs: self.tok_i - 1,
                         },
                     });

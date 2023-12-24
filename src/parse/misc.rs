@@ -38,7 +38,7 @@ impl Parser<'_, '_> {
             main_token: usingnamespace_token,
             data: {
                 lhs: expr,
-                rhs: UNDEFINED_TOKEN,
+                rhs: UNDEFINED_NODE,
             }
         })
     }

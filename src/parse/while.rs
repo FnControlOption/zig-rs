@@ -2,6 +2,9 @@ use super::*;
 
 impl Parser<'_, '_> {
     pub(super) fn parse_while_statement(&mut self) -> Result<node::Index> {
+        let Some(for_token) = self.eat_token(token!(KeywordWhile)) else {
+            return Ok(NULL_NODE);
+        };
         todo!("parse_while_statement")
     }
 

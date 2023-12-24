@@ -2,15 +2,41 @@ use super::*;
 
 impl Parser<'_, '_> {
     pub(super) fn parse_block_expr_statement(&mut self) -> Result<node::Index> {
-        todo!("parse_block_expr_statement")
+        let block_expr = self.parse_block_expr()?;
+        if block_expr != 0 {
+            return Ok(block_expr);
+        }
+        let assign_expr = self.parse_assign_expr()?;
+        if assign_expr != 0 {
+            self.expect_semicolon(error!(ExpectedSemiAfterStmt), true)?;
+            return Ok(assign_expr);
+        }
+        Ok(NULL_NODE)
     }
 
     pub(super) fn expect_block_expr_statement(&mut self) -> Result<node::Index> {
-        todo!("expect_block_expr_statement")
+        let node = self.parse_block_expr_statement()?;
+        if node == 0 {
+            return self.fail(error!(ExpectedBlockOrExpr));
+        }
+        Ok(node)
     }
 
     pub(super) fn parse_block_expr(&mut self) -> Result<node::Index> {
-        todo!("parse_block_expr")
+        match self.token_tag(self.tok_i) {
+            token!(Identifier) => {
+                if self.token_tag(self.tok_i + 1) == token!(Colon)
+                    && self.token_tag(self.tok_i + 2) == token!(LBrace)
+                {
+                    self.tok_i += 2;
+                    self.parse_block()
+                } else {
+                    Ok(NULL_NODE)
+                }
+            }
+            token!(LBrace) => self.parse_block(),
+            _ => Ok(NULL_NODE),
+        }
     }
 
     pub(super) fn parse_block(&mut self) -> Result<node::Index> {

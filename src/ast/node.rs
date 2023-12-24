@@ -488,14 +488,14 @@ pub trait ExtraData<const N: usize>: Sized {
 
     fn from_slice(slice: &[Index]) -> Self;
 
-    fn index_to_range(index: Index) -> std::ops::Range<usize> {
-        let start = index as usize;
+    fn field_range(start: Index) -> std::ops::Range<usize> {
+        let start = start as usize;
         let end = start + N;
         start..end
     }
 
-    fn from_ast(ast: &Ast, index: Index) -> Self {
-        Self::from_slice(&ast.extra_data[Self::index_to_range(index)])
+    fn from_start(tree: &Ast, start: Index) -> Self {
+        Self::from_slice(&tree.extra_data[Self::field_range(start)])
     }
 }
 

@@ -76,31 +76,80 @@ impl Parser<'_, '_> {
         &mut self,
         comptime_token: Option<TokenIndex>,
     ) -> Result<node::Index> {
-        let mut lhs = Vec::new();
+        let mut scratch = Vec::new();
 
         loop {
             let var_decl_proto = self.parse_var_decl_proto()?;
             if var_decl_proto != 0 {
-                lhs.push(var_decl_proto);
+                scratch.push(var_decl_proto);
             } else {
                 let expr = self.parse_expr()?;
                 if expr == 0 {
-                    if lhs.len() == 0 {
+                    if scratch.len() == 0 {
                         return self.fail(error!(ExpectedStatement));
                     } else {
                         return self.fail(error!(ExpectedExprOrVarDecl));
                     }
                 }
-                lhs.push(expr);
+                scratch.push(expr);
             }
             if eat_token!(self, Comma).is_none() {
                 break;
             }
         }
 
-        assert!(lhs.len() > 0);
+        let lhs_count = scratch.len();
+        assert!(lhs_count > 0);
 
-        // let equal_token = match
+        let equal_token = match self.eat_token(token!(Equal)) {
+            Some(token) => token,
+            None => 'eql: {
+                if lhs_count > 1 {
+                    if let Some(tok) = self.eat_token(token!(EqualEqual)) {
+                        self.warn_msg(Error {
+                            tag: error!(WrongEqualVarDecl),
+                            token: tok,
+                            ..Default::default()
+                        });
+                        break 'eql tok;
+                    }
+                    return self.fail_expected(token!(Equal));
+                }
+                let lhs = scratch[0];
+                match self.node(lhs).tag {
+                    node!(GlobalVarDecl)
+                    | node!(LocalVarDecl)
+                    | node!(SimpleVarDecl)
+                    | node!(AlignedVarDecl) => {
+                        if let Some(tok) = self.eat_token(token!(EqualEqual)) {
+                            self.warn_msg(Error {
+                                tag: error!(WrongEqualVarDecl),
+                                token: tok,
+                                ..Default::default()
+                            });
+                            break 'eql tok;
+                        }
+                        return self.fail_expected(token!(Equal));
+                    }
+                    _ => {}
+                }
+
+                let expr = self.finish_assign_expr(lhs)?;
+                self.expect_semicolon(error!(ExpectedSemiAfterStmt), true)?;
+                if let Some(t) = comptime_token {
+                    return Ok(self.add_node(Node {
+                        tag: node!(Comptime),
+                        main_token: t,
+                        data: node::Data {
+                            lhs: expr,
+                            rhs: UNDEFINED_NODE,
+                        },
+                    }));
+                } else {
+                    return Ok(expr);
+                }
+            }
+        };
         todo!("expect_var_decl_expr_statement")
     }
 }

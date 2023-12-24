@@ -13,7 +13,20 @@ impl Parser<'_, '_> {
         match self.token_tag(self.tok_i) {
             token!(KeywordNosuspend) => todo!("expect_statement"),
             token!(KeywordSuspend) => todo!("expect_statement"),
-            token!(KeywordDefer) => todo!("expect_statement"),
+            token!(KeywordDefer) => {
+                if allow_defer_var {
+                    let main_token = self.next_token();
+                    let rhs = self.expect_block_expr_statement()?;
+                    return Ok(self.add_node(Node {
+                        tag: node!(Defer),
+                        main_token,
+                        data: node::Data {
+                            lhs: UNDEFINED_NODE,
+                            rhs,
+                        },
+                    }));
+                }
+            }
             token!(KeywordErrdefer) => todo!("expect_statement"),
             token!(KeywordSwitch) => todo!("expect_statement"),
             token!(KeywordIf) => todo!("expect_statement"),
@@ -24,8 +37,8 @@ impl Parser<'_, '_> {
                         tag: Identifier,
                         main_token: identifier,
                         data: {
-                            lhs: UNDEFINED_TOKEN,
-                            rhs: UNDEFINED_TOKEN,
+                            lhs: UNDEFINED_NODE,
+                            rhs: UNDEFINED_NODE,
                         }
                     });
                 }
@@ -56,7 +69,7 @@ impl Parser<'_, '_> {
             return add_node!(self, {
                 tag: Comptime,
                 main_token: comptime_token,
-                data: { lhs: block_expr, rhs: UNDEFINED_TOKEN }
+                data: { lhs: block_expr, rhs: UNDEFINED_NODE }
             });
         }
         self.expect_var_decl_expr_statement(Some(comptime_token))

@@ -10,8 +10,8 @@ impl Parser<'_, '_> {
             tag: node!(FnProto),
             main_token: UNDEFINED_TOKEN,
             data: node::Data {
-                lhs: UNDEFINED_TOKEN,
-                rhs: UNDEFINED_TOKEN,
+                lhs: UNDEFINED_NODE,
+                rhs: UNDEFINED_NODE,
             },
         });
 
@@ -94,7 +94,27 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn expect_param_decl(&mut self) -> Result<node::Index> {
-        todo!("expect_param_decl")
+        self.eat_doc_comments();
+        match self.token_tag(self.tok_i) {
+            token!(KeywordNoalias) | token!(KeywordComptime) => self.tok_i += 1,
+            token!(Ellipsis3) => {
+                self.tok_i += 1;
+                return Ok(NULL_NODE);
+            }
+            _ => {}
+        }
+        if self.token_tag(self.tok_i) == token!(Identifier)
+            && self.token_tag(self.tok_i + 1) == token!(Colon)
+        {
+            self.tok_i += 2;
+        }
+        match self.token_tag(self.tok_i) {
+            token!(KeywordAnytype) => {
+                self.tok_i += 1;
+                Ok(NULL_NODE)
+            }
+            _ => self.expect_type_expr(),
+        }
     }
 
     pub(super) fn parse_param_decl_list(&mut self) -> Result<SmallSpan> {
@@ -110,7 +130,28 @@ impl Parser<'_, '_> {
             if self.eat_token(token!(RParen)).is_some() {
                 break;
             }
-            todo!("parse_param_decl_list")
+            if matches!(varargs, Varargs::Seen) {
+                varargs = Varargs::Nonfinal(self.tok_i);
+            }
+            let param = self.expect_param_decl()?;
+            if param != 0 {
+                params.push(param);
+            } else if self.token_tag(self.tok_i - 1) == token!(Ellipsis3) {
+                if matches!(varargs, Varargs::None) {
+                    varargs = Varargs::Seen;
+                }
+            }
+            match self.token_tag(self.tok_i) {
+                token!(Comma) => self.tok_i += 1,
+                token!(RParen) => {
+                    self.tok_i += 1;
+                    break;
+                }
+                token!(Colon) | token!(RBrace) | token!(RBracket) => {
+                    return self.fail_expected(token!(RParen))
+                }
+                _ => self.warn(error!(ExpectedCommaAfterParam)),
+            }
         }
         if let Varargs::Nonfinal(token) = varargs {
             self.warn_msg(Error {

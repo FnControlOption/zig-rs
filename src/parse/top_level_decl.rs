@@ -37,7 +37,7 @@ impl Parser<'_, '_> {
                         main_token: self.node(fn_proto).main_token,
                         data: node::Data {
                             lhs: fn_proto,
-                            rhs: UNDEFINED_TOKEN,
+                            rhs: UNDEFINED_NODE,
                         },
                     });
                     let body_block = self.parse_block()?;
