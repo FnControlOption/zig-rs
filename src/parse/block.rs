@@ -40,7 +40,7 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn parse_block(&mut self) -> Result<node::Index> {
-        let Some(lbrace) = eat_token!(self, LBrace) else {
+        let Some(lbrace) = self.eat_token(token!(LBrace)) else {
             return Ok(NULL_NODE);
         };
         let mut statements = Vec::new();
@@ -54,52 +54,49 @@ impl Parser<'_, '_> {
             }
             statements.push(statement);
         }
-        expect_token!(self, RBrace)?;
+        self.expect_token(token!(RBrace))?;
         let semicolon = self.token_tag(self.tok_i - 2) == token!(Semicolon);
         match statements.len() {
-            0 => add_node!(self, {
-                tag: BlockTwo,
+            0 => Ok(self.add_node(Node {
+                tag: node!(BlockTwo),
                 main_token: lbrace,
-                data: {
-                    lhs: 0,
-                    rhs: 0,
-                }
-            }),
-            1 => add_node!(self, {
-                tag: match semicolon {
+                data: node::Data { lhs: 0, rhs: 0 },
+            })),
+            1 => Ok(self.add_node(Node {
+                tag: (match semicolon {
                     true => node!(BlockTwoSemicolon),
                     false => node!(BlockTwo),
-                },
+                }),
                 main_token: lbrace,
-                data: {
+                data: node::Data {
                     lhs: statements[0],
                     rhs: 0,
-                }
-            }),
-            2 => add_node!(self, {
-                tag: match semicolon {
+                },
+            })),
+            2 => Ok(self.add_node(Node {
+                tag: (match semicolon {
                     true => node!(BlockTwoSemicolon),
                     false => node!(BlockTwo),
-                },
+                }),
                 main_token: lbrace,
-                data: {
+                data: node::Data {
                     lhs: statements[0],
                     rhs: statements[1],
-                }
-            }),
+                },
+            })),
             _ => {
                 let span = self.list_to_span(&statements);
-                add_node!(self, {
-                    tag: match semicolon {
+                Ok(self.add_node(Node {
+                    tag: (match semicolon {
                         true => node!(BlockSemicolon),
                         false => node!(Block),
-                    },
+                    }),
                     main_token: lbrace,
-                    data: {
+                    data: node::Data {
                         lhs: span.start,
                         rhs: span.end,
-                    }
-                })
+                    },
+                }))
             }
         }
     }

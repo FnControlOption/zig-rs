@@ -170,16 +170,17 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn parse_prefix_expr(&mut self) -> Result<node::Index> {
-        match self.token_tag(self.tok_i) {
-            token!(Bang)
-            | token!(Minus)
-            | token!(Tilde)
-            | token!(MinusPercent)
-            | token!(Ampersand)
-            | token!(KeywordTry)
-            | token!(KeywordAwait) => todo!("parse_prefix_expr"),
+        let tag = match self.token_tag(self.tok_i) {
+            token!(Bang) => node!(BoolNot),
+            token!(Minus) => node!(Negation),
+            token!(Tilde) => node!(BitNot),
+            token!(MinusPercent) => node!(NegationWrap),
+            token!(Ampersand) => node!(AddressOf),
+            token!(KeywordTry) => node!(Try),
+            token!(KeywordAwait) => node!(Await),
             _ => return self.parse_primary_expr(),
-        }
+        };
+        todo!("parse_prefix_expr")
     }
 
     pub(super) fn expect_prefix_expr(&mut self) -> Result<node::Index> {
@@ -198,7 +199,29 @@ impl Parser<'_, '_> {
             token!(KeywordReturn) => todo!("parse_primary_expr"),
             token!(Identifier) => {
                 if self.token_tag(self.tok_i + 1) == token!(Colon) {
-                    todo!("parse_primary_expr")
+                    match self.token_tag(self.tok_i + 2) {
+                        token!(KeywordInline) => {
+                            self.tok_i += 3;
+                            match self.token_tag(self.tok_i) {
+                                token!(KeywordFor) => self.parse_for_expr(),
+                                token!(KeywordWhile) => self.parse_while_expr(),
+                                _ => self.fail(error!(ExpectedInlinable)),
+                            }
+                        }
+                        token!(KeywordFor) => {
+                            self.tok_i += 2;
+                            self.parse_for_expr()
+                        }
+                        token!(KeywordWhile) => {
+                            self.tok_i += 2;
+                            self.parse_while_expr()
+                        }
+                        token!(LBrace) => {
+                            self.tok_i += 2;
+                            self.parse_block()
+                        }
+                        _ => self.parse_curly_suffix_expr(),
+                    }
                 } else {
                     self.parse_curly_suffix_expr()
                 }
@@ -253,7 +276,7 @@ impl Parser<'_, '_> {
             };
             let mut params = Vec::new();
             loop {
-                if eat_token!(self, RParen).is_some() {
+                if self.eat_token(token!(RParen)).is_some() {
                     break;
                 }
                 let param = self.expect_expr()?;
@@ -309,11 +332,36 @@ impl Parser<'_, '_> {
 
     pub(super) fn parse_suffix_op(&mut self, lhs: node::Index) -> Result<node::Index> {
         match self.token_tag(self.tok_i) {
-            token!(LBracket)
-            | token!(PeriodAsterisk)
-            | token!(InvalidPeriodAsterisks)
-            | token!(Period) => todo!("parse_suffix_op"),
-            _ => return Ok(NULL_NODE),
+            token!(LBracket) => todo!("parse_suffix_op"),
+            token!(PeriodAsterisk) => todo!("parse_suffix_op"),
+            token!(InvalidPeriodAsterisks) => todo!("parse_suffix_op"),
+            token!(Period) => match self.token_tag(self.tok_i + 1) {
+                token!(Identifier) => {
+                    let main_token = self.next_token();
+                    let rhs = self.next_token();
+                    Ok(self.add_node(Node {
+                        tag: node!(FieldAccess),
+                        main_token,
+                        data: node::Data { lhs, rhs },
+                    }))
+                }
+                token!(QuestionMark) => {
+                    let main_token = self.next_token();
+                    let rhs = self.next_token();
+                    Ok(self.add_node(Node {
+                        tag: node!(UnwrapOptional),
+                        main_token,
+                        data: node::Data { lhs, rhs },
+                    }))
+                }
+                token!(LBrace) => Ok(NULL_NODE),
+                _ => {
+                    self.tok_i += 1;
+                    self.warn(error!(ExpectedSuffixOp));
+                    Ok(NULL_NODE)
+                }
+            },
+            _ => Ok(NULL_NODE),
         }
     }
 }

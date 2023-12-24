@@ -359,7 +359,7 @@ pub struct Tokenizer<'src> {
     pending_invalid_token: Option<Token>,
 }
 
-impl<'src> Tokenizer<'src> {
+impl Tokenizer<'_> {
     /// For debugging purposes
     pub fn dump(&self, token: &Token) {
         let string = String::from_utf8_lossy(&self.buffer[token.loc.start..token.loc.end]);

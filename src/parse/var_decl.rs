@@ -41,9 +41,27 @@ impl Parser<'_, '_> {
                 }));
             }
 
-            todo!("parse_var_decl_proto")
+            let lhs = self.add_extra(node::LocalVarDecl {
+                type_node,
+                align_node,
+            });
+            Ok(self.add_node(Node {
+                tag: node!(LocalVarDecl),
+                main_token: mut_token,
+                data: node::Data { lhs, rhs: 0 },
+            }))
         } else {
-            todo!("parse_var_decl_proto")
+            let lhs = self.add_extra(node::GlobalVarDecl {
+                type_node,
+                align_node,
+                addrspace_node,
+                section_node,
+            });
+            Ok(self.add_node(Node {
+                tag: node!(GlobalVarDecl),
+                main_token: mut_token,
+                data: node::Data { lhs, rhs: 0 },
+            }))
         }
     }
 
@@ -93,7 +111,7 @@ impl Parser<'_, '_> {
                 }
                 scratch.push(expr);
             }
-            if eat_token!(self, Comma).is_none() {
+            if self.eat_token(token!(Comma)).is_none() {
                 break;
             }
         }
@@ -150,6 +168,37 @@ impl Parser<'_, '_> {
                 }
             }
         };
-        todo!("expect_var_decl_expr_statement")
+
+        let rhs = self.expect_expr()?;
+        self.expect_semicolon(error!(ExpectedSemiAfterStmt), true)?;
+
+        if lhs_count == 1 {
+            let lhs = scratch[0];
+            match self.node(lhs).tag {
+                node!(GlobalVarDecl)
+                | node!(LocalVarDecl)
+                | node!(SimpleVarDecl)
+                | node!(AlignedVarDecl) => {
+                    self.node_mut(lhs).data.rhs = rhs;
+                    return Ok(lhs);
+                }
+                _ => {}
+            }
+            todo!("expect_var_decl_expr_statement")
+        }
+
+        let extra_start = self.extra_data.len();
+        self.extra_data.reserve(lhs_count + 1);
+        self.extra_data.push(lhs_count as node::Index);
+        self.extra_data.append(&mut scratch);
+
+        Ok(self.add_node(Node {
+            tag: node!(AssignDestructure),
+            main_token: equal_token,
+            data: node::Data {
+                lhs: extra_start as node::Index,
+                rhs,
+            },
+        }))
     }
 }

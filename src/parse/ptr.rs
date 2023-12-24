@@ -1,7 +1,10 @@
 use super::*;
 
 pub struct PtrModifiers {
-    // TODO
+    pub align_node: node::Index,
+    pub addrspace_node: node::Index,
+    pub bit_range_start: node::Index,
+    pub bit_range_end: node::Index,
 }
 
 impl Parser<'_, '_> {
@@ -14,6 +17,62 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn parse_ptr_modifiers(&mut self) -> Result<PtrModifiers> {
-        todo!("parse_ptr_modifiers")
+        let mut result = PtrModifiers {
+            align_node: 0,
+            addrspace_node: 0,
+            bit_range_start: 0,
+            bit_range_end: 0,
+        };
+        let mut saw_const = false;
+        let mut saw_volatile = false;
+        let mut saw_allowzero = false;
+        loop {
+            match self.token_tag(self.tok_i) {
+                token!(KeywordAlign) => {
+                    if result.align_node != 0 {
+                        self.warn(error!(ExtraAlignQualifier));
+                    }
+                    self.tok_i += 1;
+                    self.expect_token(token!(LParen))?;
+                    result.align_node = self.expect_expr()?;
+
+                    if self.eat_token(token!(Colon)).is_some() {
+                        result.bit_range_start = self.expect_expr()?;
+                        self.expect_token(token!(Colon))?;
+                        result.bit_range_start = self.expect_expr()?;
+                    }
+
+                    self.expect_token(token!(RParen))?;
+                }
+                token!(KeywordConst) => {
+                    if saw_const {
+                        self.warn(error!(ExtraConstQualifier));
+                    }
+                    self.tok_i += 1;
+                    saw_const = true;
+                }
+                token!(KeywordVolatile) => {
+                    if saw_volatile {
+                        self.warn(error!(ExtraVolatileQualifier));
+                    }
+                    self.tok_i += 1;
+                    saw_volatile = true;
+                }
+                token!(KeywordAllowzero) => {
+                    if saw_allowzero {
+                        self.warn(error!(ExtraAllowzeroQualifier));
+                    }
+                    self.tok_i += 1;
+                    saw_allowzero = true;
+                }
+                token!(KeywordAddrspace) => {
+                    if result.addrspace_node != 0 {
+                        self.warn(error!(ExtraAddrspaceQualifier));
+                    }
+                    result.addrspace_node = self.parse_addr_space()?;
+                }
+                _ => return Ok(result),
+            }
+        }
     }
 }

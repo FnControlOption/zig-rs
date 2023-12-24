@@ -15,7 +15,7 @@ pub struct Ast<'src> {
     pub errors: Vec<Error>,
 }
 
-impl<'src> Ast<'src> {
+impl Ast<'_> {
     pub fn token_tag(&self, index: TokenIndex) -> token::Tag {
         self.token_tags[index as usize]
     }
@@ -36,13 +36,13 @@ impl<'src> Ast<'src> {
 pub type TokenIndex = u32;
 pub type ByteOffset = u32;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Mode {
     Zig,
     Zon,
 }
 
-impl<'src> Ast<'src> {
+impl Ast<'_> {
     pub fn parse(source: &[u8], mode: Mode) -> Ast {
         // Empirically, the zig std lib has an 8:1 ratio of source bytes to token count.
         let estimated_token_count = source.len() / 8;

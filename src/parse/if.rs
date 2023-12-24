@@ -9,10 +9,10 @@ impl Parser<'_, '_> {
         self.parse_if(Self::expect_expr)
     }
 
-    pub(super) fn parse_if<F>(&mut self, body_parse_fn: F) -> Result<node::Index>
-    where
-        F: FnMut(&mut Self) -> Result<node::Index>,
-    {
+    pub(super) fn parse_if(
+        &mut self,
+        body_parse_fn: impl FnMut(&mut Self) -> Result<node::Index>,
+    ) -> Result<node::Index> {
         todo!("parse_if")
     }
 }

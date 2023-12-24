@@ -6,41 +6,95 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn expect_statement(&mut self, allow_defer_var: bool) -> Result<node::Index> {
-        if let Some(comptime_token) = eat_token!(self, KeywordComptime) {
-            todo!("expect_statement")
+        if let Some(comptime_token) = self.eat_token(token!(KeywordComptime)) {
+            let block_expr = self.parse_block_expr()?;
+            if block_expr != 0 {
+                return Ok(self.add_node(Node {
+                    tag: node!(Comptime),
+                    main_token: comptime_token,
+                    data: node::Data {
+                        lhs: block_expr,
+                        rhs: UNDEFINED_NODE,
+                    },
+                }));
+            }
+
+            if allow_defer_var {
+                return self.expect_var_decl_expr_statement(Some(comptime_token));
+            } else {
+                let assign = self.expect_assign_expr()?;
+                self.expect_semicolon(error!(ExpectedSemiAfterStmt), true)?;
+                return Ok(assign);
+            }
         }
 
         match self.token_tag(self.tok_i) {
-            token!(KeywordNosuspend) => todo!("expect_statement"),
-            token!(KeywordSuspend) => todo!("expect_statement"),
+            token!(KeywordNosuspend) => {
+                let token = self.next_token();
+                let block_expr = self.expect_block_expr_statement()?;
+                return Ok(self.add_node(Node {
+                    tag: node!(Nosuspend),
+                    main_token: token,
+                    data: node::Data {
+                        lhs: block_expr,
+                        rhs: UNDEFINED_NODE,
+                    },
+                }));
+            }
+            token!(KeywordSuspend) => {
+                let token = self.next_token();
+                let block_expr = self.expect_block_expr_statement()?;
+                return Ok(self.add_node(Node {
+                    tag: node!(Suspend),
+                    main_token: token,
+                    data: node::Data {
+                        lhs: block_expr,
+                        rhs: UNDEFINED_NODE,
+                    },
+                }));
+            }
             token!(KeywordDefer) => {
                 if allow_defer_var {
-                    let main_token = self.next_token();
-                    let rhs = self.expect_block_expr_statement()?;
+                    let token = self.next_token();
+                    let block_expr = self.expect_block_expr_statement()?;
                     return Ok(self.add_node(Node {
                         tag: node!(Defer),
-                        main_token,
+                        main_token: token,
                         data: node::Data {
                             lhs: UNDEFINED_NODE,
-                            rhs,
+                            rhs: block_expr,
                         },
                     }));
                 }
             }
-            token!(KeywordErrdefer) => todo!("expect_statement"),
-            token!(KeywordSwitch) => todo!("expect_statement"),
-            token!(KeywordIf) => todo!("expect_statement"),
+            token!(KeywordErrdefer) => {
+                if allow_defer_var {
+                    let token = self.next_token();
+                    let payload = self.parse_payload()?;
+                    let block_expr = self.expect_block_expr_statement()?;
+                    return Ok(self.add_node(Node {
+                        tag: node!(Errdefer),
+                        main_token: token,
+                        data: node::Data {
+                            lhs: payload,
+                            rhs: block_expr,
+                        },
+                    }));
+                }
+            }
+            token!(KeywordSwitch) => return self.expect_switch_expr(),
+            token!(KeywordIf) => return self.expect_if_statement(),
             token!(KeywordEnum) | token!(KeywordStruct) | token!(KeywordUnion) => {
                 let identifier = self.tok_i + 1;
                 if self.parse_c_style_container()? {
-                    return add_node!(self, {
-                        tag: Identifier,
+                    return Ok(self.add_node(Node {
+                        tag: node!(Identifier),
                         main_token: identifier,
-                        data: {
+                        data: node::Data {
                             lhs: UNDEFINED_NODE,
                             rhs: UNDEFINED_NODE,
-                        }
-                    });
+                        },
+                    }));
                 }
             }
             _ => {}
@@ -66,11 +120,14 @@ impl Parser<'_, '_> {
     ) -> Result<node::Index> {
         let block_expr = self.parse_block_expr()?;
         if block_expr != 0 {
-            return add_node!(self, {
-                tag: Comptime,
+            return Ok(self.add_node(Node {
+                tag: node!(Comptime),
                 main_token: comptime_token,
-                data: { lhs: block_expr, rhs: UNDEFINED_NODE }
-            });
+                data: node::Data {
+                    lhs: block_expr,
+                    rhs: UNDEFINED_NODE,
+                },
+            }));
         }
         self.expect_var_decl_expr_statement(Some(comptime_token))
     }

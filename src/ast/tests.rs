@@ -1,8 +1,6 @@
 use super::*;
-use crate::{
-    ast::node::ExtraData,
-    macros::{node, token},
-};
+use crate::ast::node::ExtraData;
+use crate::macros::{node, token};
 
 macro_rules! assert_node {
     ($tree:ident, $index:expr, $tag:ident) => {{
@@ -268,6 +266,23 @@ fn test_defer() {
 }
 
 #[test]
+fn test_errdefer() {
+    let (tree, index) = parse_zig("const _ = { errdefer {} };");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.rhs, BlockTwo);
+    let node = assert_node!(tree, node.data.lhs, Errdefer);
+    assert_eq!(node.data.lhs, 0);
+    assert_ne!(node.data.rhs, 0);
+
+    let (tree, index) = parse_zig("const _ = { errdefer |foo| {} };");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.rhs, BlockTwo);
+    let node = assert_node!(tree, node.data.lhs, Errdefer);
+    assert_ne!(node.data.lhs, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
 fn test_block_two() {
     let (tree, index) = parse_zig("const _ = { defer {} };");
     let node = assert_node!(tree, index, SimpleVarDecl);
@@ -293,6 +308,93 @@ fn test_block() {
     let node = assert_node!(tree, index, SimpleVarDecl);
     let node = assert_node!(tree, node.data.rhs, Block);
     assert_eq!(node.data.rhs - node.data.lhs, 4);
+}
+
+#[test]
+fn test_aligned_var_decl() {
+    let (tree, index) = parse_zig("var foo align(bar) = undefined;");
+    let node = assert_node!(tree, index, AlignedVarDecl);
+    assert_ne!(node.data.lhs, 0);
+    assert_ne!(node.data.rhs, 0);
+
+    let (tree, index) = parse_zig("const foo align(bar) = undefined;");
+    let node = assert_node!(tree, index, AlignedVarDecl);
+    assert_ne!(node.data.lhs, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
+fn test_local_var_decl() {
+    let (tree, index) = parse_zig("var foo: Foo align(bar) = undefined;");
+    let node = assert_node!(tree, index, LocalVarDecl);
+    let node::LocalVarDecl {
+        type_node,
+        align_node,
+    } = ExtraData::from_start(&tree, node.data.lhs);
+    assert_ne!(type_node, 0);
+    assert_ne!(align_node, 0);
+    assert_ne!(node.data.rhs, 0);
+
+    let (tree, index) = parse_zig("const foo: Foo align(bar) = undefined;");
+    let node = assert_node!(tree, index, LocalVarDecl);
+    let node::LocalVarDecl {
+        type_node,
+        align_node,
+    } = ExtraData::from_start(&tree, node.data.lhs);
+    assert_ne!(type_node, 0);
+    assert_ne!(align_node, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
+fn test_global_var_decl() {
+    let (tree, index) = parse_zig("var foo linksection(bar) = undefined;");
+    let node = assert_node!(tree, index, GlobalVarDecl);
+    let node::GlobalVarDecl {
+        type_node,
+        align_node,
+        addrspace_node,
+        section_node,
+    } = ExtraData::from_start(&tree, node.data.lhs);
+    assert_eq!(type_node, 0);
+    assert_eq!(align_node, 0);
+    assert_eq!(addrspace_node, 0);
+    assert_ne!(section_node, 0);
+    assert_ne!(node.data.rhs, 0);
+
+    let (tree, index) = parse_zig("const foo addrspace(bar) = undefined;");
+    let node = assert_node!(tree, index, GlobalVarDecl);
+    let node::GlobalVarDecl {
+        type_node,
+        align_node,
+        addrspace_node,
+        section_node,
+    } = ExtraData::from_start(&tree, node.data.lhs);
+    assert_eq!(type_node, 0);
+    assert_eq!(align_node, 0);
+    assert_ne!(addrspace_node, 0);
+    assert_eq!(section_node, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
+fn test_nosuspend() {
+    let (tree, index) = parse_zig("const _ = { nosuspend {} };");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.rhs, BlockTwo);
+    let node = assert_node!(tree, node.data.lhs, Nosuspend);
+    assert_ne!(node.data.lhs, 0);
+    // rhs is unused
+}
+
+#[test]
+fn test_suspend() {
+    let (tree, index) = parse_zig("const _ = { suspend {} };");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.rhs, BlockTwo);
+    let node = assert_node!(tree, node.data.lhs, Suspend);
+    assert_ne!(node.data.lhs, 0);
+    // rhs is unused
 }
 
 // #[test]

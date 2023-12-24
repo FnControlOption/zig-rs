@@ -11,14 +11,14 @@ impl Parser<'_, '_> {
         if block_node == 0 {
             return self.fail(error!(ExpectedBlock));
         }
-        add_node!(self, {
-            tag: TestDecl,
+        Ok(self.add_node(Node {
+            tag: node!(TestDecl),
             main_token: test_token,
-            data: {
+            data: node::Data {
                 lhs: name_token.unwrap_or(0),
                 rhs: block_node,
-            }
-        })
+            },
+        }))
     }
 
     pub(super) fn expect_test_decl_recoverable(&mut self) -> node::Index {
@@ -33,14 +33,14 @@ impl Parser<'_, '_> {
         let usingnamespace_token = self.assert_token(token!(KeywordUsingnamespace));
         let expr = self.expect_expr()?;
         self.expect_semicolon(error!(ExpectedSemiAfterDecl), false)?;
-        add_node!(self, {
-            tag: Usingnamespace,
+        Ok(self.add_node(Node {
+            tag: node!(Usingnamespace),
             main_token: usingnamespace_token,
-            data: {
+            data: node::Data {
                 lhs: expr,
                 rhs: UNDEFINED_NODE,
-            }
-        })
+            },
+        }))
     }
 
     pub(super) fn expect_using_namespace_recoverable(&mut self) -> node::Index {

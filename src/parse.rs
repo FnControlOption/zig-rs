@@ -63,47 +63,6 @@ impl Parser<'_, '_> {
     }
 }
 
-macro_rules! add_node {
-    ($p:ident, { tag: $tag:ident, main_token: $main_token:expr, data: { lhs: $lhs:expr, rhs: $rhs:expr $(,)? } $(,)? } $(,)?) => {
-        add_node!($p, {
-            tag: node!($tag),
-            main_token: $main_token,
-            data: {
-                lhs: $lhs,
-                rhs: $rhs,
-            }
-        })
-    };
-    ($p:ident, { tag: $tag:expr, main_token: $main_token:expr, data: { lhs: $lhs:expr, rhs: $rhs:expr $(,)? } $(,)? } $(,)?) => {
-        Ok($p.add_node(Node {
-            tag: $tag,
-            main_token: $main_token,
-            data: node::Data {
-                lhs: $lhs,
-                rhs: $rhs,
-            },
-        }))
-    };
-}
-
-pub(crate) use add_node;
-
-macro_rules! expect_token {
-    ($p:ident, $tag:ident) => {
-        $p.expect_token(token!($tag))
-    };
-}
-
-pub(crate) use expect_token;
-
-macro_rules! eat_token {
-    ($p:ident, $tag:ident) => {
-        $p.eat_token(token!($tag))
-    };
-}
-
-pub(crate) use eat_token;
-
 impl Parser<'_, '_> {
     fn list_to_span(&mut self, list: &[node::Index]) -> node::SubRange {
         self.extra_data.extend_from_slice(list);
@@ -124,10 +83,7 @@ impl Parser<'_, '_> {
         i as node::Index
     }
 
-    fn add_extra<const N: usize, E>(&mut self, extra: E) -> node::Index
-    where
-        E: node::ExtraData<N>,
-    {
+    fn add_extra<const N: usize>(&mut self, extra: impl node::ExtraData<N>) -> node::Index {
         let result = self.extra_data.len() as u32;
         let data = extra.to_array();
         self.extra_data.extend_from_slice(&data);

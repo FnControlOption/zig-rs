@@ -500,24 +500,54 @@ pub trait ExtraData<const N: usize>: Sized {
 }
 
 macro_rules! extra_data {
-        ($name:ident, $size:literal, $($(#[$attr:meta])* $field:ident: Index $(,)?)*) => {
-            pub struct $name {
-                $($(#[$attr])* pub $field: Index,)*
+    ($name:ident, $size:literal, $($(#[$attr:meta])* $field:ident: $type:ident),* $(,)?) => {
+        pub struct $name {
+            $($(#[$attr])* pub $field: $type),*
+        }
+
+        impl ExtraData<$size> for $name {
+            fn to_array(&self) -> [Index; $size] {
+                [$(self.$field),*]
             }
 
-            impl ExtraData<$size> for $name {
-                fn to_array(&self) -> [Index; $size] {
-                    [$(self.$field,)*]
-                }
-
-                fn from_slice(slice: &[Index]) -> Self {
-                    let mut index = 0;
-                    $(let $field = slice[index]; index += 1;)*
-                    Self { $($field,)* }
-                }
+            fn from_slice(slice: &[Index]) -> Self {
+                let mut index = 0;
+                $(let $field = slice[index]; index += 1;)*
+                Self { $($field),* }
             }
-        };
-    }
+        }
+
+        crate::ast::debug::extra_data_impl!($name, $($field),*);
+    };
+}
+
+extra_data! {
+    LocalVarDecl, 2,
+    type_node: Index,
+    align_node: Index,
+}
+
+extra_data! {
+    ArrayTypeSentinel, 2,
+    elem_type: Index,
+    sentinel: Index,
+}
+
+extra_data! {
+    PtrType, 3,
+    sentinel: Index,
+    align_node: Index,
+    addrspace_node: Index,
+}
+
+extra_data! {
+    PtrTypeBitRange, 5,
+    sentinel: Index,
+    align_node: Index,
+    addrspace_node: Index,
+    bit_range_start: Index,
+    bit_range_end: Index,
+}
 
 extra_data! {
     SubRange, 2,
@@ -528,7 +558,9 @@ extra_data! {
 }
 
 extra_data! {
-    If, 0,
+    If, 2,
+    then_expr: Index,
+    else_expr: Index,
 }
 
 extra_data! {
@@ -538,23 +570,42 @@ extra_data! {
 }
 
 extra_data! {
-    GlobalVarDecl, 0,
+    GlobalVarDecl, 4,
+    /// Populated if there is an explicit type ascription.
+    type_node: Index,
+    /// Populated if align(A) is present.
+    align_node: Index,
+    /// Populated if addrspace(A) is present.
+    addrspace_node: Index,
+    /// Populated if linksection(A) is present.
+    section_node: Index,
 }
 
 extra_data! {
-    Slice, 0,
+    Slice, 2,
+    start: Index,
+    end: Index,
 }
 
 extra_data! {
-    SliceSentinel, 0,
+    SliceSentinel, 3,
+    start: Index,
+    /// May be 0 if the slice is "open"
+    end: Index,
+    sentinel: Index,
 }
 
 extra_data! {
-    While, 0,
+    While, 3,
+    cont_expr: Index,
+    then_expr: Index,
+    else_expr: Index,
 }
 
 extra_data! {
-    WhileCont, 0,
+    WhileCont, 2,
+    cont_expr: Index,
+    then_expr: Index,
 }
 
 extra_data! {
@@ -590,5 +641,9 @@ extra_data! {
 }
 
 extra_data! {
-    Asm, 0,
+    Asm, 3,
+    items_start: Index,
+    items_end: Index,
+    /// Needed to make lastToken() work.
+    rparen: TokenIndex,
 }

@@ -214,36 +214,36 @@ impl Parser<'_, '_> {
         };
 
         if align_expr == 0 {
-            add_node!(self, {
-                tag: ContainerFieldInit,
-                main_token: main_token,
-                data: {
+            Ok(self.add_node(Node {
+                tag: node!(ContainerFieldInit),
+                main_token,
+                data: node::Data {
                     lhs: type_expr,
                     rhs: value_expr,
-                }
-            })
+                },
+            }))
         } else if value_expr == 0 {
-            add_node!(self, {
-                tag: ContainerFieldAlign,
-                main_token: main_token,
-                data: {
+            Ok(self.add_node(Node {
+                tag: node!(ContainerFieldAlign),
+                main_token,
+                data: node::Data {
                     lhs: type_expr,
                     rhs: align_expr,
-                }
-            })
+                },
+            }))
         } else {
             let rhs = self.add_extra(node::ContainerField {
                 value_expr,
                 align_expr,
             });
-            add_node!(self, {
-                tag: ContainerField,
-                main_token: main_token,
-                data: {
+            Ok(self.add_node(Node {
+                tag: node!(ContainerField),
+                main_token,
+                data: node::Data {
                     lhs: type_expr,
-                    rhs: rhs,
-                }
-            })
+                    rhs,
+                },
+            }))
         }
     }
 
