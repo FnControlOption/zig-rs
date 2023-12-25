@@ -15,7 +15,7 @@ mod macros;
 mod parse;
 
 fn main() {
-    let source = r#"asm"#;
+    let source = r#""#;
     let tree = Ast::parse(source.as_bytes(), ast::Mode::Zig);
     for error in tree.errors.iter() {
         println!("{:?}", error.tag);

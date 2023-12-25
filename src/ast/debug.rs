@@ -202,8 +202,8 @@ fn data_types_of(mode: Mode, tag: node::Tag) -> PairType {
         node!(BlockTwoSemicolon) => data!(Node, Node),
         node!(Block) => data!(SubList),
         node!(BlockSemicolon) => data!(SubList),
-        // node!(AsmSimple) => data!(Unknown, Token),
-        // node!(Asm) => data!(Unknown, extra!(Asm)),
+        node!(AsmSimple) => data!(Node, Token),
+        node!(Asm) => data!(Node, extra!(Asm)),
         // node!(AsmOutput) => data!(Unknown, Token),
         // node!(AsmInput) => data!(Unknown, Token),
         node!(ErrorValue) => data!(Token, Token),
@@ -376,7 +376,7 @@ impl node::FnProto {
         let origin = Self::field_range(start);
         dump_header!(f, depth, name, Some(origin), "FnProto")?;
 
-        let node::FnProto {
+        let Self {
             params_start,
             params_end,
             align_expr,
@@ -405,6 +405,42 @@ impl node::FnProto {
     }
 }
 
+impl node::Asm {
+    pub fn dump_data(
+        &self,
+        tree: &Ast,
+        f: &mut std::fmt::Formatter<'_>,
+        depth: usize,
+        name: Option<&str>,
+        start: node::Index,
+    ) -> std::fmt::Result {
+        let origin = Self::field_range(start);
+        dump_header!(f, depth, name, Some(origin), "Asm")?;
+
+        let Self {
+            items_start,
+            items_end,
+            rparen,
+        } = *self;
+
+        {
+            let name = "items";
+            let origin = start + 0..start + 2;
+            let range = items_start..items_end;
+            tree.dump_children(f, depth, Some(name), Some(origin), range)?;
+        }
+
+        {
+            let name = "rparen";
+            let origin = start + 2;
+            let index = rparen;
+            tree.dump_token(f, depth, Some(name), Some(origin), index)?;
+        }
+
+        Ok(())
+    }
+}
+
 macro_rules! extra_data_all_nodes {
     ($type:ident) => {
         impl node::$type {
@@ -419,23 +455,6 @@ macro_rules! extra_data_all_nodes {
                 let origin = Self::field_range(start);
                 dump_header!(f, depth, name, Some(origin), stringify!($type))?;
                 self.dump_fields_as_nodes(tree, f, depth, start)
-            }
-        }
-    };
-}
-
-macro_rules! extra_data_todo {
-    ($type:ident) => {
-        impl node::$type {
-            pub fn dump_data(
-                &self,
-                tree: &Ast,
-                f: &mut std::fmt::Formatter<'_>,
-                depth: usize,
-                name: Option<&str>,
-                start: node::Index,
-            ) -> std::fmt::Result {
-                todo!(concat!(stringify!($type), "::dump_data"))
             }
         }
     };
@@ -527,4 +546,4 @@ extra_data_all_nodes!(WhileCont);
 extra_data_all_nodes!(For);
 extra_data_all_nodes!(FnProtoOne);
 // extra_data_todo!(FnProto);
-extra_data_todo!(Asm);
+// extra_data_todo!(Asm);

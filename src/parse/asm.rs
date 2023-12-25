@@ -2,10 +2,59 @@ use super::*;
 
 impl Parser<'_, '_> {
     pub(super) fn expect_asm_expr(&mut self) -> Result<node::Index> {
-        todo!("expect_asm_expr")
+        let asm_token = self.assert_token(token!(KeywordAsm));
+        self.eat_token(token!(KeywordVolatile));
+        self.expect_token(token!(LParen))?;
+        let template = self.expect_expr()?;
+
+        if let Some(rparen) = self.eat_token(token!(RParen)) {
+            return Ok(self.add_node(Node {
+                tag: node!(AsmSimple),
+                main_token: asm_token,
+                data: node::Data {
+                    lhs: template,
+                    rhs: rparen,
+                },
+            }));
+        }
+
+        self.expect_token(token!(Colon))?;
+
+        let mut scratch = Vec::new();
+
+        loop {
+            let output_item = self.parse_asm_output_item()?;
+            if output_item == 0 {
+                break;
+            }
+            scratch.push(output_item);
+            match self.token_tag(self.tok_i) {
+                token!(Comma) => self.tok_i += 1,
+                token!(Colon) | token!(RParen) | token!(RBrace) | token!(RBracket) => break,
+                _ => self.warn_expected(token!(Comma)),
+            }
+        }
+        if self.eat_token(token!(Colon)).is_some() {
+            todo!("expect_asm_expr")
+        }
+        let rparen = self.expect_token(token!(RParen))?;
+        let span = self.list_to_span(&scratch);
+        let rhs = self.add_extra(node::Asm {
+            items_start: span.start,
+            items_end: span.end,
+            rparen,
+        });
+        Ok(self.add_node(Node {
+            tag: node!(Asm),
+            main_token: asm_token,
+            data: node::Data { lhs: template, rhs },
+        }))
     }
 
     pub(super) fn parse_asm_output_item(&mut self) -> Result<node::Index> {
+        if self.eat_token(token!(LBracket)).is_none() {
+            return Ok(NULL_NODE);
+        }
         todo!("parse_asm_output_item")
     }
 

@@ -189,7 +189,7 @@ impl Parser<'_, '_> {
 
     pub(super) fn parse_primary_expr(&mut self) -> Result<node::Index> {
         match self.token_tag(self.tok_i) {
-            token!(KeywordAsm) => todo!("parse_primary_expr"),
+            token!(KeywordAsm) => self.expect_asm_expr(),
             token!(KeywordIf) => todo!("parse_primary_expr"),
             token!(KeywordBreak) => todo!("parse_primary_expr"),
             token!(KeywordContinue) => todo!("parse_primary_expr"),
