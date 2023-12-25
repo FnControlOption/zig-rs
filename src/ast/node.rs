@@ -494,7 +494,7 @@ pub trait ExtraData<const N: usize>: Sized {
         start..end
     }
 
-    fn from_start(tree: &Ast, start: Index) -> Self {
+    fn from_ast(tree: &Ast, start: Index) -> Self {
         Self::from_slice(&tree.extra_data[Self::field_range(start)])
     }
 }
@@ -517,7 +517,13 @@ macro_rules! extra_data {
             }
         }
 
-        crate::ast::debug::extra_data_impl!($type, $($field),*);
+        impl GetExtraData<$type> for Ast<'_> {
+            fn extra_data(&self, index: node::Index) -> $type {
+                $type::from_ast(self, index)
+            }
+        }
+
+        debug::extra_data_impl!($type, $($field),*);
     };
 }
 

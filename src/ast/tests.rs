@@ -1,5 +1,6 @@
 use super::*;
 use crate::ast::node::ExtraData;
+use crate::ast::GetExtraData;
 use crate::macros::{node, token};
 
 macro_rules! assert_node {
@@ -170,7 +171,7 @@ fn test_call() {
     let node = assert_node!(tree, node.data.rhs, Call);
     assert_ne!(node.data.lhs, 0);
     assert_ne!(node.data.rhs, 0);
-    let range = node::SubRange::from_start(&tree, node.data.rhs);
+    let range = node::SubRange::from_ast(&tree, node.data.rhs);
     assert_eq!(range.end - range.start, 2);
 
     let (tree, index) = parse_zig("const _ = foo(a, b, c);");
@@ -178,7 +179,7 @@ fn test_call() {
     let node = assert_node!(tree, node.data.rhs, Call);
     assert_ne!(node.data.lhs, 0);
     assert_ne!(node.data.rhs, 0);
-    let range = node::SubRange::from_start(&tree, node.data.rhs);
+    let range = node::SubRange::from_ast(&tree, node.data.rhs);
     assert_eq!(range.end - range.start, 3);
 }
 
@@ -214,7 +215,7 @@ fn test_fn_proto_multi() {
     assert_ne!(node.data.lhs, 0);
     assert_ne!(node.data.rhs, 0);
 
-    let range = node::SubRange::from_start(&tree, node.data.lhs);
+    let range = node::SubRange::from_ast(&tree, node.data.lhs);
     assert_eq!(range.end - range.start, 2);
 
     let (tree, index) = parse_zig("fn foo(a: A, b: B, c: C) void {}");
@@ -223,7 +224,7 @@ fn test_fn_proto_multi() {
     assert_ne!(node.data.lhs, 0);
     assert_ne!(node.data.rhs, 0);
 
-    let range = node::SubRange::from_start(&tree, node.data.lhs);
+    let range = node::SubRange::from_ast(&tree, node.data.lhs);
     assert_eq!(range.end - range.start, 3);
 }
 
@@ -330,7 +331,7 @@ fn test_local_var_decl() {
     let node::LocalVarDecl {
         type_node,
         align_node,
-    } = ExtraData::from_start(&tree, node.data.lhs);
+    } = ExtraData::from_ast(&tree, node.data.lhs);
     assert_ne!(type_node, 0);
     assert_ne!(align_node, 0);
     assert_ne!(node.data.rhs, 0);
@@ -340,7 +341,7 @@ fn test_local_var_decl() {
     let node::LocalVarDecl {
         type_node,
         align_node,
-    } = ExtraData::from_start(&tree, node.data.lhs);
+    } = ExtraData::from_ast(&tree, node.data.lhs);
     assert_ne!(type_node, 0);
     assert_ne!(align_node, 0);
     assert_ne!(node.data.rhs, 0);
@@ -355,7 +356,7 @@ fn test_global_var_decl() {
         align_node,
         addrspace_node,
         section_node,
-    } = ExtraData::from_start(&tree, node.data.lhs);
+    } = ExtraData::from_ast(&tree, node.data.lhs);
     assert_eq!(type_node, 0);
     assert_eq!(align_node, 0);
     assert_eq!(addrspace_node, 0);
@@ -369,7 +370,7 @@ fn test_global_var_decl() {
         align_node,
         addrspace_node,
         section_node,
-    } = ExtraData::from_start(&tree, node.data.lhs);
+    } = ExtraData::from_ast(&tree, node.data.lhs);
     assert_eq!(type_node, 0);
     assert_eq!(align_node, 0);
     assert_ne!(addrspace_node, 0);
@@ -397,11 +398,145 @@ fn test_suspend() {
     // rhs is unused
 }
 
+#[test]
+fn test_field_access() {
+    let (tree, index) = parse_zig("const _ = foo.bar;");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.rhs, FieldAccess);
+    assert_ne!(node.data.lhs, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
+fn test_var_decl_in_block() {
+    let (tree, index) = parse_zig("const _ = { var a = foo; };");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.rhs, BlockTwoSemicolon);
+    let node = assert_node!(tree, node.data.lhs, SimpleVarDecl);
+    assert_eq!(node.data.lhs, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
+fn test_assign_destructure() {
+    let (tree, index) = parse_zig("const _ = { var a, const b = foo; };");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.rhs, BlockTwoSemicolon);
+    let node = assert_node!(tree, node.data.lhs, AssignDestructure);
+    let lhs_count: node::Index = tree.extra_data(node.data.lhs);
+    assert_eq!(lhs_count, 2);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
+fn test_ptr_type_aligned() {
+    let (tree, index) = parse_zig("const foo: []Foo = undefined;");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.lhs, PtrTypeAligned);
+    assert_eq!(node.data.lhs, 0);
+    assert_ne!(node.data.rhs, 0);
+
+    let (tree, index) = parse_zig("const foo: []align(bar) Foo = undefined;");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.lhs, PtrTypeAligned);
+    assert_ne!(node.data.lhs, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
+fn test_array_type() {
+    let (tree, index) = parse_zig("const foo: [bar]Foo = undefined;");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.lhs, ArrayType);
+    assert_ne!(node.data.lhs, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
+fn test_array_type_sentinel() {
+    let (tree, index) = parse_zig("const foo: [bar:baz]Foo = undefined;");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.lhs, ArrayTypeSentinel);
+    assert_ne!(node.data.lhs, 0);
+    let node::ArrayTypeSentinel {
+        elem_type,
+        sentinel,
+    } = tree.extra_data(node.data.rhs);
+    assert_ne!(elem_type, 0);
+    assert_ne!(sentinel, 0);
+}
+
+#[test]
+fn test_ptr_type_sentinel() {
+    let (tree, index) = parse_zig("const foo: [:bar]Foo = undefined;");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.lhs, PtrTypeSentinel);
+    assert_ne!(node.data.lhs, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
+fn test_ptr_type() {
+    let (tree, index) = parse_zig("const foo: [:bar]align(baz) Foo = undefined;");
+    let node = assert_node!(tree, index, SimpleVarDecl);
+    let node = assert_node!(tree, node.data.lhs, PtrType);
+    let node::PtrType {
+        sentinel,
+        align_node,
+        addrspace_node,
+    } = tree.extra_data(node.data.lhs);
+    assert_ne!(sentinel, 0);
+    assert_ne!(align_node, 0);
+    assert_eq!(addrspace_node, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
+fn test_fn_proto_one() {
+    let (tree, index) = parse_zig("fn foo(a: A) addrspace(bar) void {}");
+    let node = assert_node!(tree, index, FnDecl);
+    let node = assert_node!(tree, node.data.lhs, FnProtoOne);
+    let node::FnProtoOne {
+        param,
+        align_expr,
+        addrspace_expr,
+        section_expr,
+        callconv_expr,
+    } = tree.extra_data(node.data.lhs);
+    assert_ne!(param, 0);
+    assert_eq!(align_expr, 0);
+    assert_ne!(addrspace_expr, 0);
+    assert_eq!(section_expr, 0);
+    assert_eq!(callconv_expr, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
+#[test]
+fn test_fn_proto() {
+    let (tree, index) = parse_zig("fn foo(a: A, b: B) addrspace(bar) void {}");
+    let node = assert_node!(tree, index, FnDecl);
+    let node = assert_node!(tree, node.data.lhs, FnProto);
+    let node::FnProto {
+        params_start,
+        params_end,
+        align_expr,
+        addrspace_expr,
+        section_expr,
+        callconv_expr,
+    } = tree.extra_data(node.data.lhs);
+    assert_eq!(params_end - params_start, 2);
+    assert_eq!(align_expr, 0);
+    assert_ne!(addrspace_expr, 0);
+    assert_eq!(section_expr, 0);
+    assert_eq!(callconv_expr, 0);
+    assert_ne!(node.data.rhs, 0);
+}
+
 // #[test]
 // fn test_() {
 //     let (tree, index) = parse_zig("");
 //     let node = assert_node!(tree, index, SimpleVarDecl);
-//     let node = assert_node!(tree, node.data.rhs, );
-//     assert_ne!(node.data.lhs, 0);
-//     assert_eq!(node.data.rhs, 0);
+//     let node = assert_node!(tree, node.data.lhs, );
+//     assert_eq!(node.data.lhs, 0);
+//     assert_ne!(node.data.rhs, 0);
 // }

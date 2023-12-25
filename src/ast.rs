@@ -27,8 +27,14 @@ impl Ast<'_> {
     pub fn node(&self, index: node::Index) -> &Node {
         &self.nodes[index as usize]
     }
+}
 
-    pub fn extra_data(&self, index: node::Index) -> node::Index {
+pub trait GetExtraData<T> {
+    fn extra_data(&self, index: node::Index) -> T;
+}
+
+impl GetExtraData<node::Index> for Ast<'_> {
+    fn extra_data(&self, index: node::Index) -> node::Index {
         self.extra_data[index as usize]
     }
 }
@@ -111,5 +117,7 @@ pub use error::Error;
 
 pub mod node;
 pub use node::Node;
+
+use self::node::ExtraData;
 
 mod debug;

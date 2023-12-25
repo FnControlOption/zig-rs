@@ -334,7 +334,7 @@ impl Ast<'_> {
                 DataType::Node => self.dump_child(f, depth, Some(name), None, data)?,
                 DataType::Token => self.dump_token(f, depth, Some(name), None, data)?,
                 DataType::NodeSlice => {
-                    let count = self.extra_data(data);
+                    let count: node::Index = self.extra_data(data);
                     let start = data + 1;
                     let end = start + count;
                     self.dump_children(f, depth, Some(name), Some(data), start..end)?;
@@ -483,8 +483,8 @@ macro_rules! extra_data_types {
                 match self {
                     $(
                         ExtraDataType::$type => {
-                            let data = node::$type::from_start(tree, start);
-                            data.dump_data(tree, f, depth, name, start)
+                            let extra: node::$type = tree.extra_data(start);
+                            extra.dump_data(tree, f, depth, name, start)
                         }
                     )*
                 }
