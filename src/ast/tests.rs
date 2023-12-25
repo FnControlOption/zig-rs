@@ -5,7 +5,7 @@ use crate::macros::{node, token};
 
 // After changing DUMP_TREE to true, run `cargo test` with `--show-output`:
 //
-//     cargo test --quiet ast::tests -- --show-output
+//     cargo test ast::tests -- --show-output
 //
 const DUMP_TREE: bool = false;
 
