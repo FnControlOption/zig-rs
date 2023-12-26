@@ -61,8 +61,27 @@ impl Parser<'_, '_> {
                     trailing = false;
                 }
                 token!(KeywordComptime) => todo!("parse_container_members"),
-                token!(KeywordPub) => todo!("parse_container_members"),
-                token!(KeywordUsingnamespace) => todo!("parse_container_members"),
+                token!(KeywordPub) => {
+                    self.tok_i += 1;
+                    let top_level_decl = self.expect_top_level_decl_recoverable();
+                    if top_level_decl != 0 {
+                        if matches!(field_state, FieldState::Seen) {
+                            field_state = FieldState::End(top_level_decl);
+                        }
+                        items.push(top_level_decl);
+                    }
+                    trailing = self.token_tag(self.tok_i - 1) == token!(Semicolon);
+                }
+                token!(KeywordUsingnamespace) => {
+                    let node = self.expect_using_namespace_recoverable();
+                    if node != 0 {
+                        if matches!(field_state, FieldState::Seen) {
+                            field_state = FieldState::End(node);
+                        }
+                        items.push(node);
+                    }
+                    trailing = self.token_tag(self.tok_i - 1) == token!(Semicolon);
+                }
                 token!(KeywordConst)
                 | token!(KeywordVar)
                 | token!(KeywordThreadlocal)
@@ -253,7 +272,30 @@ impl Parser<'_, '_> {
             token!(KeywordEnum) | token!(KeywordUnion) | token!(KeywordStruct) => {}
             _ => return Ok(false),
         }
-        todo!("parse_c_style_container")
+        let identifier = self.tok_i + 1;
+        if self.token_tag(identifier) != token!(Identifier) {
+            return Ok(false);
+        }
+        self.tok_i += 2;
+
+        self.warn_msg(Error {
+            tag: error!(CStyleContainer(self.token_tag(main_token))),
+            token: identifier,
+            ..Default::default()
+        });
+
+        self.warn_msg(Error {
+            tag: error!(ZigStyleContainer(self.token_tag(main_token))),
+            is_note: true,
+            token: identifier,
+            ..Default::default()
+        });
+
+        self.expect_token(token!(LBrace))?;
+        self.parse_container_members();
+        self.expect_token(token!(RBrace))?;
+        self.expect_semicolon(error!(ExpectedSemiAfterDecl), true)?;
+        Ok(true)
     }
 
     pub(super) fn parse_container_decl_auto(&mut self) -> Result<node::Index> {

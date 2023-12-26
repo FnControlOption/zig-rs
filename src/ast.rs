@@ -16,6 +16,10 @@ pub struct Ast<'src> {
 }
 
 impl Ast<'_> {
+    pub fn source_slice(&self, start: ByteOffset) -> &[u8] {
+        &self.source[start as usize..]
+    }
+
     pub fn token_tag(&self, index: TokenIndex) -> token::Tag {
         self.token_tags[index as usize]
     }

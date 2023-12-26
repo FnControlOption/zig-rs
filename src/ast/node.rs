@@ -535,8 +535,8 @@ extra_data! {
 
 extra_data! {
     ArrayTypeSentinel, 2,
-    elem_type: Index,
     sentinel: Index,
+    elem_type: Index,
 }
 
 extra_data! {
@@ -571,8 +571,8 @@ extra_data! {
 
 extra_data! {
     ContainerField, 2,
-    value_expr: Index,
     align_expr: Index,
+    value_expr: Index,
 }
 
 extra_data! {

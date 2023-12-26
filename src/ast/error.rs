@@ -19,7 +19,7 @@ impl Default for Error {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Tag {
     Unknown,
 
@@ -77,14 +77,14 @@ pub enum Tag {
     ExpectedInitializer,
     MismatchedBinaryOpWhitespace,
     InvalidAmpersandAmpersand,
-    CStyleContainer,
+    CStyleContainer(token::Tag),
     ExpectedVarConst,
     WrongEqualVarDecl,
     VarConstDecl,
     ExtraForCapture,
     ForInputNotCaptured,
 
-    ZigStyleContainer,
+    ZigStyleContainer(token::Tag),
     PreviousField,
     NextField,
 

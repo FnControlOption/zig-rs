@@ -2,6 +2,12 @@ macro_rules! error {
     ($tag:ident) => {
         crate::ast::error::Tag::$tag
     };
+    ($tag:ident($value:expr)) => {
+        crate::ast::error::Tag::$tag($value)
+    };
+    ($tag:ident($p:pat)) => {
+        crate::ast::error::Tag::$tag($p)
+    };
 }
 
 macro_rules! node {
