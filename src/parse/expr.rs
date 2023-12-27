@@ -127,9 +127,8 @@ impl Parser<'_, '_> {
 
             let oper_token = self.next_token();
             if tok_tag == token!(KeywordCatch) {
-                todo!("parse_expr_precedence");
+                self.parse_payload()?;
             }
-
             let rhs = self.parse_expr_precedence(info.prec + 1)?;
             if rhs == 0 {
                 self.warn(error::Tag::ExpectedExpr);
@@ -180,23 +179,88 @@ impl Parser<'_, '_> {
             token!(KeywordAwait) => node!(Await),
             _ => return self.parse_primary_expr(),
         };
-        todo!("parse_prefix_expr")
+        let main_token = self.next_token();
+        let lhs = self.expect_prefix_expr()?;
+        let rhs = UNDEFINED_NODE;
+        Ok(self.add_node(Node {
+            tag,
+            main_token,
+            data: node::Data { lhs, rhs },
+        }))
     }
 
     pub(super) fn expect_prefix_expr(&mut self) -> Result<node::Index> {
-        todo!("expect_prefix_expr")
+        let node = self.parse_prefix_expr()?;
+        if node == 0 {
+            return self.fail(error!(ExpectedPrefixExpr));
+        }
+        Ok(node)
     }
 
     pub(super) fn parse_primary_expr(&mut self) -> Result<node::Index> {
         match self.token_tag(self.tok_i) {
             token!(KeywordAsm) => self.expect_asm_expr(),
-            token!(KeywordIf) => todo!("parse_primary_expr"),
-            token!(KeywordBreak) => todo!("parse_primary_expr"),
-            token!(KeywordContinue) => todo!("parse_primary_expr"),
-            token!(KeywordComptime) => todo!("parse_primary_expr"),
-            token!(KeywordNosuspend) => todo!("parse_primary_expr"),
-            token!(KeywordResume) => todo!("parse_primary_expr"),
-            token!(KeywordReturn) => todo!("parse_primary_expr"),
+            token!(KeywordIf) => self.parse_if_expr(),
+            token!(KeywordBreak) => {
+                let main_token = self.next_token();
+                let lhs = self.parse_break_label()?;
+                let rhs = self.parse_expr()?;
+                Ok(self.add_node(Node {
+                    tag: node!(Break),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
+            token!(KeywordContinue) => {
+                let main_token = self.next_token();
+                let lhs = self.parse_break_label()?;
+                let rhs = UNDEFINED_NODE;
+                Ok(self.add_node(Node {
+                    tag: node!(Continue),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
+            token!(KeywordComptime) => {
+                let main_token = self.next_token();
+                let lhs = self.expect_expr()?;
+                let rhs = UNDEFINED_NODE;
+                Ok(self.add_node(Node {
+                    tag: node!(Comptime),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
+            token!(KeywordNosuspend) => {
+                let main_token = self.next_token();
+                let lhs = self.expect_expr()?;
+                let rhs = UNDEFINED_NODE;
+                Ok(self.add_node(Node {
+                    tag: node!(Nosuspend),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
+            token!(KeywordResume) => {
+                let main_token = self.next_token();
+                let lhs = self.expect_expr()?;
+                let rhs = UNDEFINED_NODE;
+                Ok(self.add_node(Node {
+                    tag: node!(Resume),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
+            token!(KeywordReturn) => {
+                let main_token = self.next_token();
+                let lhs = self.parse_expr()?;
+                let rhs = UNDEFINED_NODE;
+                Ok(self.add_node(Node {
+                    tag: node!(Return),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
             token!(Identifier) => {
                 if self.token_tag(self.tok_i + 1) == token!(Colon) {
                     match self.token_tag(self.tok_i + 2) {
@@ -226,9 +290,16 @@ impl Parser<'_, '_> {
                     self.parse_curly_suffix_expr()
                 }
             }
-            token!(KeywordInline) => todo!("parse_primary_expr"),
-            token!(KeywordFor) => todo!("parse_primary_expr"),
-            token!(KeywordWhile) => todo!("parse_primary_expr"),
+            token!(KeywordInline) => {
+                self.tok_i += 1;
+                match self.token_tag(self.tok_i) {
+                    token!(KeywordFor) => self.parse_for_expr(),
+                    token!(KeywordWhile) => self.parse_while_expr(),
+                    _ => self.fail(error!(ExpectedInlinable)),
+                }
+            }
+            token!(KeywordFor) => self.parse_for_expr(),
+            token!(KeywordWhile) => self.parse_while_expr(),
             token!(LBrace) => self.parse_block(),
             _ => self.parse_curly_suffix_expr(),
         }
@@ -242,7 +313,60 @@ impl Parser<'_, '_> {
         let Some(lbrace) = self.eat_token(token!(LBrace)) else {
             return Ok(lhs);
         };
-        todo!("parse_curly_suffix_expr")
+
+        let mut inits = Vec::new();
+        let field_init = self.parse_field_init()?;
+        if field_init != 0 {
+            inits.push(field_init);
+            todo!("parse_curly_suffix_expr")
+        }
+
+        loop {
+            if self.eat_token(token!(RBrace)).is_some() {
+                break;
+            }
+            let elem_init = self.expect_expr()?;
+            inits.push(elem_init);
+            match self.token_tag(self.tok_i) {
+                token!(Comma) => self.tok_i += 1,
+                token!(RBrace) => {
+                    self.tok_i += 1;
+                    break;
+                }
+                token!(Colon) | token!(RParen) | token!(RBracket) => {
+                    return self.fail_expected(token!(RBrace));
+                }
+                _ => self.warn(error!(ExpectedCommaAfterInitializer)),
+            }
+        }
+        let comma = self.token_tag(self.tok_i - 2) == token!(Comma);
+        match inits.len() {
+            0 => Ok(self.add_node(Node {
+                tag: node!(StructInitOne),
+                main_token: lbrace,
+                data: node::Data { lhs, rhs: 0 },
+            })),
+            1 => Ok(self.add_node(Node {
+                tag: match comma {
+                    true => node!(ArrayInitOneComma),
+                    false => node!(ArrayInitOne),
+                },
+                main_token: lbrace,
+                data: node::Data { lhs, rhs: inits[0] },
+            })),
+            _ => {
+                let span = self.list_to_span(&inits);
+                let rhs = self.add_extra(span);
+                Ok(self.add_node(Node {
+                    tag: match comma {
+                        true => node!(ArrayInitComma),
+                        false => node!(ArrayInit),
+                    },
+                    main_token: lbrace,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
+        }
     }
 
     pub(super) fn parse_error_union_expr(&mut self) -> Result<node::Index> {
@@ -253,7 +377,15 @@ impl Parser<'_, '_> {
         let Some(bang) = self.eat_token(token!(Bang)) else {
             return Ok(suffix_expr);
         };
-        todo!("parse_error_union_expr")
+        let rhs = self.expect_type_expr()?;
+        Ok(self.add_node(Node {
+            tag: node!(ErrorUnion),
+            main_token: bang,
+            data: node::Data {
+                lhs: suffix_expr,
+                rhs,
+            },
+        }))
     }
 
     pub(super) fn parse_suffix_expr(&mut self) -> Result<node::Index> {
@@ -332,9 +464,76 @@ impl Parser<'_, '_> {
 
     pub(super) fn parse_suffix_op(&mut self, lhs: node::Index) -> Result<node::Index> {
         match self.token_tag(self.tok_i) {
-            token!(LBracket) => todo!("parse_suffix_op"),
-            token!(PeriodAsterisk) => todo!("parse_suffix_op"),
-            token!(InvalidPeriodAsterisks) => todo!("parse_suffix_op"),
+            token!(LBracket) => {
+                let lbracket = self.next_token();
+                let index_expr = self.expect_expr()?;
+
+                if self.eat_token(token!(Ellipsis2)).is_some() {
+                    let end_expr = self.parse_expr()?;
+                    if self.eat_token(token!(Colon)).is_some() {
+                        let sentinel = self.expect_expr()?;
+                        self.expect_token(token!(RBracket))?;
+                        let rhs = self.add_extra(node::SliceSentinel {
+                            start: index_expr,
+                            end: end_expr,
+                            sentinel,
+                        });
+                        return Ok(self.add_node(Node {
+                            tag: node!(SliceSentinel),
+                            main_token: lbracket,
+                            data: node::Data { lhs, rhs },
+                        }));
+                    }
+                    self.expect_token(token!(RBracket))?;
+                    if end_expr == 0 {
+                        return Ok(self.add_node(Node {
+                            tag: node!(SliceOpen),
+                            main_token: lbracket,
+                            data: node::Data {
+                                lhs,
+                                rhs: index_expr,
+                            },
+                        }));
+                    }
+                    let rhs = self.add_extra(node::Slice {
+                        start: index_expr,
+                        end: end_expr,
+                    });
+                    return Ok(self.add_node(Node {
+                        tag: node!(Slice),
+                        main_token: lbracket,
+                        data: node::Data { lhs, rhs },
+                    }));
+                }
+                self.expect_token(token!(RBracket))?;
+                Ok(self.add_node(Node {
+                    tag: node!(ArrayAccess),
+                    main_token: lbracket,
+                    data: node::Data {
+                        lhs,
+                        rhs: index_expr,
+                    },
+                }))
+            }
+            token!(PeriodAsterisk) => {
+                let main_token = self.next_token();
+                let rhs = UNDEFINED_NODE;
+                Ok(self.add_node(Node {
+                    tag: node!(Deref),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
+            token!(InvalidPeriodAsterisks) => {
+                self.warn(error!(AsteriskAfterPtrDeref));
+                let main_token = self.next_token();
+                let rhs = UNDEFINED_NODE;
+                Ok(self.add_node(Node {
+                    tag: node!(Deref),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
             token!(Period) => match self.token_tag(self.tok_i + 1) {
                 token!(Identifier) => {
                     let main_token = self.next_token();
