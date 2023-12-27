@@ -1,4 +1,5 @@
 use super::*;
+use bitfield::bitfield;
 
 pub struct Node {
     pub tag: Tag,
@@ -614,8 +615,10 @@ extra_data! {
     then_expr: Index,
 }
 
-extra_data! {
-    For, 0,
+bitfield! {
+    pub struct For(Index);
+    pub u32, get_inputs, set_inputs: 30, 0;
+    pub get_has_else, set_has_else: 31;
 }
 
 extra_data! {

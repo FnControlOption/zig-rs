@@ -19,6 +19,7 @@ enum DataType {
 enum PairType {
     SubList,
     Pair(DataType, DataType),
+    For,
 }
 
 macro_rules! data {
@@ -154,7 +155,7 @@ fn data_types_of(mode: Mode, tag: node::Tag) -> PairType {
         // node!(WhileCont) => data!(Node, extra!(WhileCont)),
         // node!(While) => data!(Node, extra!(While)),
         node!(ForSimple) => data!(Node, Node),
-        // node!(For) => data!(Unknown, Unknown),
+        node!(For) => data!(For),
         node!(ForRange) => data!(Node, Node),
         node!(IfSimple) => data!(Node, Node),
         node!(Suspend) => data!(Node, Unused),
@@ -222,7 +223,7 @@ fn indent(depth: usize) -> String {
     " ".repeat(depth * 2)
 }
 
-macro_rules! dump_header {
+macro_rules! dump_line {
     ($f:ident, $depth:expr, $name:expr, $origin:expr, $($arg:tt)*) => {{
         write!($f, "{}", indent($depth))?;
         if let Some(name) = $name {
@@ -234,7 +235,7 @@ macro_rules! dump_header {
         writeln!($f, $($arg)*)
     }};
     ($f:ident, $depth:expr, $name:expr, $($arg:tt)*) => {
-        dump_header!($f, $depth, $name, None::<()>, $($arg)*)
+        dump_line!($f, $depth, $name, None::<()>, $($arg)*)
     };
 }
 
@@ -248,11 +249,11 @@ impl Ast<'_> {
         index: TokenIndex,
     ) -> std::fmt::Result {
         if index == 0 {
-            dump_header!(f, depth, name, origin, "omitted token")
+            dump_line!(f, depth, name, origin, "omitted token")
         } else {
             let token_tag = self.token_tag(index);
             let token_start = self.token_start(index);
-            dump_header!(
+            dump_line!(
                 f,
                 depth,
                 name,
@@ -271,9 +272,9 @@ impl Ast<'_> {
         index: node::Index,
     ) -> std::fmt::Result {
         if index == 0 {
-            dump_header!(f, depth, name, origin, "omitted node")
+            dump_line!(f, depth, name, origin, "omitted node")
         } else {
-            dump_header!(f, depth, name, origin, "node[{index}]")?;
+            dump_line!(f, depth, name, origin, "node[{index}]")?;
             self.dump(f, self.node(index), depth + 1)
         }
     }
@@ -286,7 +287,7 @@ impl Ast<'_> {
         origin: Option<impl std::fmt::Debug>,
         range: std::ops::Range<node::Index>,
     ) -> std::fmt::Result {
-        dump_header!(f, depth, name, origin, "extra[{range:?}]")?;
+        dump_line!(f, depth, name, origin, "extra[{range:?}]")?;
         for extra_index in range {
             let node_index = self.extra_data(extra_index);
             self.dump_child(f, depth, None, Some(extra_index), node_index)?;
@@ -321,14 +322,15 @@ impl Ast<'_> {
         let (lhs_type, rhs_type) = match pair_type {
             PairType::SubList => return self.dump_children(f, depth, None, None::<()>, lhs..rhs),
             PairType::Pair(l, r) => (l, r),
+            PairType::For => return self.dump_for(f, depth, lhs, rhs),
         };
 
         for (name, data, data_type) in [("lhs", lhs, lhs_type), ("rhs", rhs, rhs_type)] {
             match data_type {
-                DataType::Unknown => dump_header!(f, depth, Some(name), "? / {data}")?,
+                DataType::Unknown => dump_line!(f, depth, Some(name), "? / {data}")?,
                 DataType::Unused => {
                     if DUMP_UNUSED_DATA {
-                        dump_header!(f, depth, Some(name), "unused / {data}")?;
+                        dump_line!(f, depth, Some(name), "unused / {data}")?;
                     }
                 }
                 DataType::Node => self.dump_child(f, depth, Some(name), None, data)?,
@@ -343,6 +345,43 @@ impl Ast<'_> {
                     extra_data_type.dump_extra_data(self, f, depth, Some(name), data)?;
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    pub fn dump_for(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        depth: usize,
+        lhs: node::Index,
+        rhs: node::Index,
+    ) -> std::fmt::Result {
+        let extra = node::For(rhs);
+        let inputs = extra.get_inputs();
+        let has_else = extra.get_has_else();
+
+        {
+            let name = "inputs";
+            let range = lhs..lhs + inputs;
+            self.dump_children(f, depth, Some(name), None::<()>, range)?;
+        }
+
+        {
+            let name = "then_expr";
+            let origin = lhs + inputs;
+            let index = self.extra_data(origin);
+            self.dump_child(f, depth, Some(name), Some(origin), index)?;
+        }
+
+        if has_else {
+            let name = "else_expr";
+            let origin = lhs + inputs + 1;
+            let index = self.extra_data(origin);
+            self.dump_child(f, depth, Some(name), Some(origin), index)?;
+        } else {
+            let name = "else_expr";
+            dump_line!(f, depth, Some(name), None::<()>, "omitted node")?;
         }
 
         Ok(())
@@ -374,7 +413,7 @@ impl node::FnProto {
         start: node::Index,
     ) -> std::fmt::Result {
         let origin = Self::field_range(start);
-        dump_header!(f, depth, name, Some(origin), "FnProto")?;
+        dump_line!(f, depth, name, Some(origin), "FnProto")?;
 
         let Self {
             params_start,
@@ -415,7 +454,7 @@ impl node::Asm {
         start: node::Index,
     ) -> std::fmt::Result {
         let origin = Self::field_range(start);
-        dump_header!(f, depth, name, Some(origin), "Asm")?;
+        dump_line!(f, depth, name, Some(origin), "Asm")?;
 
         let Self {
             items_start,
@@ -453,7 +492,7 @@ macro_rules! extra_data_all_nodes {
                 start: node::Index,
             ) -> std::fmt::Result {
                 let origin = Self::field_range(start);
-                dump_header!(f, depth, name, Some(origin), stringify!($type))?;
+                dump_line!(f, depth, name, Some(origin), stringify!($type))?;
                 self.dump_fields_as_nodes(tree, f, depth, start)
             }
         }
@@ -525,7 +564,6 @@ extra_data_types! {
     SliceSentinel,
     While,
     WhileCont,
-    For,
     FnProtoOne,
     FnProto,
     Asm,
@@ -543,7 +581,6 @@ extra_data_all_nodes!(Slice);
 extra_data_all_nodes!(SliceSentinel);
 extra_data_all_nodes!(While);
 extra_data_all_nodes!(WhileCont);
-extra_data_all_nodes!(For);
 extra_data_all_nodes!(FnProtoOne);
 // extra_data_todo!(FnProto);
 // extra_data_todo!(Asm);

@@ -10,7 +10,44 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn parse_for_expr(&mut self) -> Result<node::Index> {
-        todo!("parse_for_expr")
+        let Some(for_token) = self.eat_token(token!(KeywordFor)) else {
+            return Ok(NULL_NODE);
+        };
+
+        let mut scratch = Vec::new();
+        let inputs = self.for_prefix(&mut scratch)?;
+
+        let then_expr = self.expect_expr()?;
+        let mut has_else = false;
+        if self.eat_token(token!(KeywordElse)).is_some() {
+            scratch.push(then_expr);
+            let else_expr = self.expect_expr()?;
+            scratch.push(else_expr);
+            has_else = true;
+        } else if inputs == 1 {
+            return Ok(self.add_node(Node {
+                tag: node!(ForSimple),
+                main_token: for_token,
+                data: node::Data {
+                    lhs: scratch[0],
+                    rhs: then_expr,
+                },
+            }));
+        } else {
+            scratch.push(then_expr);
+        }
+        let lhs = self.list_to_span(&scratch).start;
+        let rhs = {
+            let mut extra = node::For(UNDEFINED_NODE);
+            extra.set_inputs(inputs as u32);
+            extra.set_has_else(has_else);
+            extra.0
+        };
+        Ok(self.add_node(Node {
+            tag: node!(For),
+            main_token: for_token,
+            data: node::Data { lhs, rhs },
+        }))
     }
 
     pub(super) fn parse_for_type_expr(&mut self) -> Result<node::Index> {

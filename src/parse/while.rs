@@ -32,7 +32,7 @@ impl Parser<'_, '_> {
         }
         self.parse_payload()?;
         let else_expr = self.expect_statement(false)?;
-        let extra = self.add_extra(node::While {
+        let rhs = self.add_extra(node::While {
             cont_expr,
             then_expr,
             else_expr,
@@ -42,7 +42,7 @@ impl Parser<'_, '_> {
             main_token: while_token,
             data: node::Data {
                 lhs: condition,
-                rhs: extra,
+                rhs,
             },
         }))
     }
@@ -69,7 +69,7 @@ impl Parser<'_, '_> {
                     },
                 }));
             } else {
-                let extra = self.add_extra(node::WhileCont {
+                let rhs = self.add_extra(node::WhileCont {
                     cont_expr,
                     then_expr,
                 });
@@ -78,14 +78,14 @@ impl Parser<'_, '_> {
                     main_token: while_token,
                     data: node::Data {
                         lhs: condition,
-                        rhs: extra,
+                        rhs,
                     },
                 }));
             }
         }
         self.parse_payload()?;
         let else_expr = self.expect_expr()?;
-        let extra = self.add_extra(node::While {
+        let rhs = self.add_extra(node::While {
             cont_expr,
             then_expr,
             else_expr,
@@ -95,7 +95,7 @@ impl Parser<'_, '_> {
             main_token: while_token,
             data: node::Data {
                 lhs: condition,
-                rhs: extra,
+                rhs,
             },
         }))
     }
@@ -122,7 +122,7 @@ impl Parser<'_, '_> {
                     },
                 }));
             } else {
-                let extra = self.add_extra(node::WhileCont {
+                let rhs = self.add_extra(node::WhileCont {
                     cont_expr,
                     then_expr,
                 });
@@ -131,14 +131,14 @@ impl Parser<'_, '_> {
                     main_token: while_token,
                     data: node::Data {
                         lhs: condition,
-                        rhs: extra,
+                        rhs,
                     },
                 }));
             }
         }
         self.parse_payload()?;
         let else_expr = self.expect_type_expr()?;
-        let extra = self.add_extra(node::While {
+        let rhs = self.add_extra(node::While {
             cont_expr,
             then_expr,
             else_expr,
@@ -148,7 +148,7 @@ impl Parser<'_, '_> {
             main_token: while_token,
             data: node::Data {
                 lhs: condition,
-                rhs: extra,
+                rhs,
             },
         }))
     }
