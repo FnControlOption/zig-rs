@@ -586,14 +586,14 @@ impl Parser<'_, '_> {
                     token!(KeywordInline) => {
                         self.tok_i += 3;
                         match self.token_tag(self.tok_i) {
-                            token!(KeywordFor) => self.parse_for_type_expr(),
+                            token!(KeywordFor) => self.parse_for(Self::expect_type_expr),
                             token!(KeywordWhile) => self.parse_while_type_expr(),
                             _ => self.fail(error!(ExpectedInlinable)),
                         }
                     }
                     token!(KeywordFor) => {
                         self.tok_i += 2;
-                        self.parse_for_type_expr()
+                        self.parse_for(Self::expect_type_expr)
                     }
                     token!(KeywordWhile) => {
                         self.tok_i += 2;
@@ -630,12 +630,12 @@ impl Parser<'_, '_> {
             token!(KeywordInline) => {
                 self.tok_i += 1;
                 match self.token_tag(self.tok_i) {
-                    token!(KeywordFor) => self.parse_for_type_expr(),
+                    token!(KeywordFor) => self.parse_for(Self::expect_type_expr),
                     token!(KeywordWhile) => self.parse_while_type_expr(),
                     _ => self.fail(error!(ExpectedInlinable)),
                 }
             }
-            token!(KeywordFor) => self.parse_for_type_expr(),
+            token!(KeywordFor) => self.parse_for(Self::expect_type_expr),
             token!(KeywordWhile) => self.parse_while_type_expr(),
             token!(Period) => match self.token_tag(self.tok_i + 1) {
                 token!(Identifier) => {

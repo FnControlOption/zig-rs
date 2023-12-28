@@ -22,13 +22,56 @@ impl Parser<'_, '_> {
                 return self.fail(error!(ExpectedBlockOrAssignment));
             }
             if self.eat_token(token!(Semicolon)).is_some() {
-                todo!("parse_while_statement")
+                if cont_expr == 0 {
+                    return Ok(self.add_node(Node {
+                        tag: node!(WhileSimple),
+                        main_token: while_token,
+                        data: node::Data {
+                            lhs: condition,
+                            rhs: assign_expr,
+                        },
+                    }));
+                } else {
+                    let lhs = condition;
+                    let rhs = self.add_extra(node::WhileCont {
+                        cont_expr,
+                        then_expr: assign_expr,
+                    });
+                    return Ok(self.add_node(Node {
+                        tag: node!(WhileCont),
+                        main_token: while_token,
+                        data: node::Data { lhs, rhs },
+                    }));
+                }
             }
             else_required = true;
             assign_expr
         };
         if self.eat_token(token!(KeywordElse)).is_none() {
-            todo!("parse_while_statement")
+            if else_required {
+                self.warn(error!(ExpectedSemiOrElse));
+            }
+            if cont_expr == 0 {
+                return Ok(self.add_node(Node {
+                    tag: node!(WhileSimple),
+                    main_token: while_token,
+                    data: node::Data {
+                        lhs: condition,
+                        rhs: then_expr,
+                    },
+                }));
+            } else {
+                let lhs = condition;
+                let rhs = self.add_extra(node::WhileCont {
+                    cont_expr,
+                    then_expr,
+                });
+                return Ok(self.add_node(Node {
+                    tag: node!(WhileCont),
+                    main_token: while_token,
+                    data: node::Data { lhs, rhs },
+                }));
+            }
         }
         self.parse_payload()?;
         let else_expr = self.expect_statement(false)?;
