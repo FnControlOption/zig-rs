@@ -286,7 +286,58 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn find_next_container_member(&mut self) {
-        todo!("find_next_container_member")
+        let mut level: u32 = 0;
+        loop {
+            let tok = self.next_token();
+            match self.token_tag(tok) {
+                token!(KeywordTest)
+                | token!(KeywordComptime)
+                | token!(KeywordPub)
+                | token!(KeywordExport)
+                | token!(KeywordExtern)
+                | token!(KeywordInline)
+                | token!(KeywordNoinline)
+                | token!(KeywordUsingnamespace)
+                | token!(KeywordThreadlocal)
+                | token!(KeywordConst)
+                | token!(KeywordVar)
+                | token!(KeywordFn) => {
+                    if level == 0 {
+                        self.tok_i -= 1;
+                        return;
+                    }
+                }
+                token!(Identifier) => {
+                    if self.token_tag(tok + 1) == token!(Comma) && level == 0 {
+                        self.tok_i -= 1;
+                        return;
+                    }
+                }
+                token!(Comma) | token!(Semicolon) => {
+                    if level == 0 {
+                        return;
+                    }
+                }
+                token!(LParen) | token!(LBracket) | token!(LBrace) => level += 1,
+                token!(RParen) | token!(RBracket) => {
+                    if level != 0 {
+                        level -= 1;
+                    }
+                }
+                token!(RBrace) => {
+                    if level == 0 {
+                        self.tok_i -= 1;
+                        return;
+                    }
+                    level -= 1;
+                }
+                token!(Eof) => {
+                    self.tok_i -= 1;
+                    return;
+                }
+                _ => {}
+            }
+        }
     }
 
     pub(super) fn expect_test_decl(&mut self) -> Result<node::Index> {

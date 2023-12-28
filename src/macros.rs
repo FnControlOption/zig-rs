@@ -5,8 +5,8 @@ macro_rules! error {
     ($tag:ident($value:expr)) => {
         crate::ast::error::Tag::$tag($value)
     };
-    ($tag:ident($p:pat)) => {
-        crate::ast::error::Tag::$tag($p)
+    ($tag:ident(_)) => {
+        crate::ast::error::Tag::$tag(_)
     };
 }
 

@@ -2,7 +2,30 @@ use super::*;
 
 impl Parser<'_, '_> {
     pub(super) fn find_next_stmt(&mut self) {
-        todo!("find_next_stmt")
+        let mut level: u32 = 0;
+        loop {
+            let tok = self.next_token();
+            match self.token_tag(tok) {
+                token!(LBrace) => level += 1,
+                token!(RBrace) => {
+                    if level == 0 {
+                        self.tok_i -= 1;
+                        return;
+                    }
+                    level -= 1;
+                }
+                token!(Semicolon) => {
+                    if level == 0 {
+                        return;
+                    }
+                }
+                token!(Eof) => {
+                    self.tok_i -= 1;
+                    return;
+                }
+                _ => {}
+            }
+        }
     }
 
     pub(super) fn expect_statement(&mut self, allow_defer_var: bool) -> Result<node::Index> {
