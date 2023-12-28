@@ -40,6 +40,14 @@ pub struct Parser<'src, 'tok> {
 }
 
 impl Parser<'_, '_> {
+    fn source(&self, range: std::ops::Range<ast::ByteOffset>) -> &[u8] {
+        &self.source[range.start as usize..range.end as usize]
+    }
+
+    fn source_byte(&self, index: ast::ByteOffset) -> u8 {
+        self.source[index as usize]
+    }
+
     fn token_tag(&self, index: TokenIndex) -> token::Tag {
         self.token_tags[index as usize]
     }

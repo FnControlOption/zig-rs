@@ -3,12 +3,195 @@ use super::*;
 impl Parser<'_, '_> {
     pub(super) fn parse_type_expr(&mut self) -> Result<node::Index> {
         match self.token_tag(self.tok_i) {
-            token!(QuestionMark) => todo!("parse_type_expr"),
-            token!(KeywordAnyframe) => todo!("parse_type_expr"),
-            token!(Asterisk) => todo!("parse_type_expr"),
-            token!(AsteriskAsterisk) => todo!("parse_type_expr"),
+            token!(QuestionMark) => {
+                let main_token = self.next_token();
+                let lhs = self.expect_type_expr()?;
+                let rhs = UNDEFINED_NODE;
+                Ok(self.add_node(Node {
+                    tag: node!(OptionalType),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
+            token!(KeywordAnyframe) => match self.token_tag(self.tok_i + 1) {
+                token!(Arrow) => {
+                    let main_token = self.next_token();
+                    let lhs = self.next_token();
+                    let rhs = self.expect_type_expr()?;
+                    Ok(self.add_node(Node {
+                        tag: node!(AnyframeType),
+                        main_token,
+                        data: node::Data { lhs, rhs },
+                    }))
+                }
+                _ => self.parse_error_union_expr(),
+            },
+            token!(Asterisk) => {
+                let asterisk = self.next_token();
+                let mods = self.parse_ptr_modifiers()?;
+                let elem_type = self.expect_type_expr()?;
+                if mods.bit_range_start != 0 {
+                    let lhs = self.add_extra(node::PtrTypeBitRange {
+                        sentinel: 0,
+                        align_node: mods.align_node,
+                        addrspace_node: mods.addrspace_node,
+                        bit_range_start: mods.bit_range_start,
+                        bit_range_end: mods.bit_range_end,
+                    });
+                    Ok(self.add_node(Node {
+                        tag: node!(PtrTypeBitRange),
+                        main_token: asterisk,
+                        data: node::Data {
+                            lhs,
+                            rhs: elem_type,
+                        },
+                    }))
+                } else if mods.addrspace_node != 0 {
+                    let lhs = self.add_extra(node::PtrType {
+                        sentinel: 0,
+                        align_node: mods.align_node,
+                        addrspace_node: mods.addrspace_node,
+                    });
+                    Ok(self.add_node(Node {
+                        tag: node!(PtrType),
+                        main_token: asterisk,
+                        data: node::Data {
+                            lhs,
+                            rhs: elem_type,
+                        },
+                    }))
+                } else {
+                    Ok(self.add_node(Node {
+                        tag: node!(PtrTypeAligned),
+                        main_token: asterisk,
+                        data: node::Data {
+                            lhs: mods.align_node,
+                            rhs: elem_type,
+                        },
+                    }))
+                }
+            }
+            token!(AsteriskAsterisk) => {
+                let asterisk = self.next_token();
+                let mods = self.parse_ptr_modifiers()?;
+                let elem_type = self.expect_type_expr()?;
+                let inner = {
+                    if mods.bit_range_start != 0 {
+                        let lhs = self.add_extra(node::PtrTypeBitRange {
+                            sentinel: 0,
+                            align_node: mods.align_node,
+                            addrspace_node: mods.addrspace_node,
+                            bit_range_start: mods.bit_range_start,
+                            bit_range_end: mods.bit_range_end,
+                        });
+                        self.add_node(Node {
+                            tag: node!(PtrTypeBitRange),
+                            main_token: asterisk,
+                            data: node::Data {
+                                lhs,
+                                rhs: elem_type,
+                            },
+                        })
+                    } else if mods.addrspace_node != 0 {
+                        let lhs = self.add_extra(node::PtrType {
+                            sentinel: 0,
+                            align_node: mods.align_node,
+                            addrspace_node: mods.addrspace_node,
+                        });
+                        self.add_node(Node {
+                            tag: node!(PtrType),
+                            main_token: asterisk,
+                            data: node::Data {
+                                lhs,
+                                rhs: elem_type,
+                            },
+                        })
+                    } else {
+                        self.add_node(Node {
+                            tag: node!(PtrTypeAligned),
+                            main_token: asterisk,
+                            data: node::Data {
+                                lhs: mods.align_node,
+                                rhs: elem_type,
+                            },
+                        })
+                    }
+                };
+                Ok(self.add_node(Node {
+                    tag: node!(PtrTypeAligned),
+                    main_token: asterisk,
+                    data: node::Data { lhs: 0, rhs: inner },
+                }))
+            }
             token!(LBracket) => match self.token_tag(self.tok_i + 1) {
-                token!(Asterisk) => todo!("parse_type_expr"),
+                token!(Asterisk) => {
+                    self.next_token();
+                    let asterisk = self.next_token();
+                    let mut sentinel: node::Index = 0;
+                    if let Some(ident) = self.eat_token(token!(Identifier)) {
+                        let ident_slice =
+                            self.source(self.token_start(ident)..self.token_start(ident + 1));
+                        if trim_ascii_end(ident_slice) != b"c" {
+                            self.tok_i -= 1;
+                        }
+                    } else if self.eat_token(token!(Colon)).is_some() {
+                        sentinel = self.expect_expr()?;
+                    }
+                    self.expect_token(token!(RBracket))?;
+                    let mods = self.parse_ptr_modifiers()?;
+                    let elem_type = self.expect_type_expr()?;
+                    if mods.bit_range_start == 0 {
+                        if sentinel == 0 && mods.addrspace_node == 0 {
+                            Ok(self.add_node(Node {
+                                tag: node!(PtrTypeAligned),
+                                main_token: asterisk,
+                                data: node::Data {
+                                    lhs: mods.align_node,
+                                    rhs: elem_type,
+                                },
+                            }))
+                        } else if mods.align_node == 0 && mods.addrspace_node == 0 {
+                            Ok(self.add_node(Node {
+                                tag: node!(PtrTypeSentinel),
+                                main_token: asterisk,
+                                data: node::Data {
+                                    lhs: sentinel,
+                                    rhs: elem_type,
+                                },
+                            }))
+                        } else {
+                            let lhs = self.add_extra(node::PtrType {
+                                sentinel,
+                                align_node: mods.align_node,
+                                addrspace_node: mods.addrspace_node,
+                            });
+                            Ok(self.add_node(Node {
+                                tag: node!(PtrType),
+                                main_token: asterisk,
+                                data: node::Data {
+                                    lhs,
+                                    rhs: elem_type,
+                                },
+                            }))
+                        }
+                    } else {
+                        let lhs = self.add_extra(node::PtrTypeBitRange {
+                            sentinel,
+                            align_node: mods.align_node,
+                            addrspace_node: mods.addrspace_node,
+                            bit_range_start: mods.bit_range_start,
+                            bit_range_end: mods.bit_range_end,
+                        });
+                        Ok(self.add_node(Node {
+                            tag: node!(PtrTypeBitRange),
+                            main_token: asterisk,
+                            data: node::Data {
+                                lhs,
+                                rhs: elem_type,
+                            },
+                        }))
+                    }
+                }
                 _ => {
                     let lbracket = self.next_token();
                     let len_expr = self.parse_expr()?;
@@ -323,20 +506,81 @@ impl Parser<'_, '_> {
                     },
                 }))
             }
-            token!(KeywordUnreachable) => todo!("parse_primary_type_expr"),
-            token!(KeywordAnyframe) => todo!("parse_primary_type_expr"),
-            token!(StringLiteral) => todo!("parse_primary_type_expr"),
-            token!(Builtin) => todo!("parse_primary_type_expr"),
-            token!(KeywordFn) => todo!("parse_primary_type_expr"),
-            token!(KeywordIf) => todo!("parse_primary_type_expr"),
-            token!(KeywordSwitch) => todo!("parse_primary_type_expr"),
-            token!(KeywordExtern) | token!(KeywordPacked) => todo!("parse_primary_type_expr"),
+            token!(KeywordUnreachable) => {
+                let main_token = self.next_token();
+                Ok(self.add_node(Node {
+                    tag: node!(UnreachableLiteral),
+                    main_token,
+                    data: node::Data {
+                        lhs: UNDEFINED_NODE,
+                        rhs: UNDEFINED_NODE,
+                    },
+                }))
+            }
+            token!(KeywordAnyframe) => {
+                let main_token = self.next_token();
+                Ok(self.add_node(Node {
+                    tag: node!(AnyframeLiteral),
+                    main_token,
+                    data: node::Data {
+                        lhs: UNDEFINED_NODE,
+                        rhs: UNDEFINED_NODE,
+                    },
+                }))
+            }
+            token!(StringLiteral) => {
+                let main_token = self.next_token();
+                Ok(self.add_node(Node {
+                    tag: node!(StringLiteral),
+                    main_token,
+                    data: node::Data {
+                        lhs: UNDEFINED_NODE,
+                        rhs: UNDEFINED_NODE,
+                    },
+                }))
+            }
+
+            token!(Builtin) => self.parse_builtin_call(),
+            token!(KeywordFn) => self.parse_fn_proto(),
+            token!(KeywordIf) => self.parse_if(Self::expect_type_expr),
+            token!(KeywordSwitch) => self.expect_switch_expr(),
+
+            token!(KeywordExtern) | token!(KeywordPacked) => {
+                self.tok_i += 1;
+                self.parse_container_decl_auto()
+            }
+
             token!(KeywordStruct)
             | token!(KeywordOpaque)
             | token!(KeywordEnum)
             | token!(KeywordUnion) => self.parse_container_decl_auto(),
-            token!(KeywordComptime) => todo!("parse_primary_type_expr"),
-            token!(MultilineStringLiteralLine) => todo!("parse_primary_type_expr"),
+
+            token!(KeywordComptime) => {
+                let main_token = self.next_token();
+                let lhs = self.expect_type_expr()?;
+                Ok(self.add_node(Node {
+                    tag: node!(Comptime),
+                    main_token,
+                    data: node::Data {
+                        lhs,
+                        rhs: UNDEFINED_NODE,
+                    },
+                }))
+            }
+            token!(MultilineStringLiteralLine) => {
+                let first_line = self.next_token();
+                while self.token_tag(self.tok_i) == token!(MultilineStringLiteralLine) {
+                    self.tok_i += 1;
+                }
+                Ok(self.add_node(Node {
+                    tag: node!(MultilineStringLiteral),
+                    main_token: first_line,
+                    data: node::Data {
+                        lhs: first_line,
+                        rhs: self.tok_i - 1,
+                    },
+                }))
+            }
             token!(Identifier) => match self.token_tag(self.tok_i + 1) {
                 token!(Colon) => match self.token_tag(self.tok_i + 2) {
                     token!(KeywordInline) => {
@@ -383,9 +627,16 @@ impl Parser<'_, '_> {
                     }))
                 }
             },
-            token!(KeywordInline) => todo!("parse_primary_type_expr"),
-            token!(KeywordFor) => todo!("parse_primary_type_expr"),
-            token!(KeywordWhile) => todo!("parse_primary_type_expr"),
+            token!(KeywordInline) => {
+                self.tok_i += 1;
+                match self.token_tag(self.tok_i) {
+                    token!(KeywordFor) => self.parse_for_type_expr(),
+                    token!(KeywordWhile) => self.parse_while_type_expr(),
+                    _ => self.fail(error!(ExpectedInlinable)),
+                }
+            }
+            token!(KeywordFor) => self.parse_for_type_expr(),
+            token!(KeywordWhile) => self.parse_while_type_expr(),
             token!(Period) => match self.token_tag(self.tok_i + 1) {
                 token!(Identifier) => {
                     let lhs = self.next_token();
@@ -436,8 +687,28 @@ impl Parser<'_, '_> {
                                 main_token: lbrace,
                                 data: node::Data { lhs, rhs: 0 },
                             })),
-                            [_, _] => todo!("parse_primary_type_expr"),
-                            _ => todo!("parse_primary_type_expr"),
+                            [lhs, rhs] => Ok(self.add_node(Node {
+                                tag: match comma {
+                                    true => node!(StructInitDotTwoComma),
+                                    false => node!(StructInitDotTwo),
+                                },
+                                main_token: lbrace,
+                                data: node::Data { lhs, rhs },
+                            })),
+                            _ => {
+                                let span = self.list_to_span(&inits);
+                                Ok(self.add_node(Node {
+                                    tag: match comma {
+                                        true => node!(StructInitDotComma),
+                                        false => node!(StructInitDot),
+                                    },
+                                    main_token: lbrace,
+                                    data: node::Data {
+                                        lhs: span.start,
+                                        rhs: span.end,
+                                    },
+                                }))
+                            }
                         };
                     }
 
@@ -447,7 +718,17 @@ impl Parser<'_, '_> {
                         }
                         let elem_init = self.expect_expr()?;
                         inits.push(elem_init);
-                        todo!("parse_primary_type_expr");
+                        match self.token_tag(self.tok_i) {
+                            token!(Comma) => self.tok_i += 1,
+                            token!(RBrace) => {
+                                self.tok_i += 1;
+                                break;
+                            }
+                            token!(Colon) | token!(RParen) | token!(RBracket) => {
+                                return self.fail_expected(token!(RBrace))
+                            }
+                            _ => self.warn(error!(ExpectedCommaAfterInitializer)),
+                        }
                     }
                     let comma = self.token_tag(self.tok_i - 2) == token!(Comma);
                     match inits[..] {
@@ -456,9 +737,36 @@ impl Parser<'_, '_> {
                             main_token: lbrace,
                             data: node::Data { lhs: 0, rhs: 0 },
                         })),
-                        [_] => todo!("parse_primary_type_expr"),
-                        [_, _] => todo!("parse_primary_type_expr"),
-                        _ => todo!("parse_primary_type_expr"),
+                        [lhs] => Ok(self.add_node(Node {
+                            tag: match comma {
+                                true => node!(ArrayInitDotTwoComma),
+                                false => node!(ArrayInitDotTwo),
+                            },
+                            main_token: lbrace,
+                            data: node::Data { lhs, rhs: 0 },
+                        })),
+                        [lhs, rhs] => Ok(self.add_node(Node {
+                            tag: match comma {
+                                true => node!(ArrayInitDotTwoComma),
+                                false => node!(ArrayInitDotTwo),
+                            },
+                            main_token: lbrace,
+                            data: node::Data { lhs, rhs: 0 },
+                        })),
+                        _ => {
+                            let span = self.list_to_span(&inits);
+                            Ok(self.add_node(Node {
+                                tag: match comma {
+                                    true => node!(ArrayInitDotComma),
+                                    false => node!(ArrayInitDot),
+                                },
+                                main_token: lbrace,
+                                data: node::Data {
+                                    lhs: span.start,
+                                    rhs: span.end,
+                                },
+                            }))
+                        }
                     }
                 }
                 _ => Ok(NULL_NODE),
@@ -471,7 +779,19 @@ impl Parser<'_, '_> {
                         if self.eat_token(token!(RBrace)).is_some() {
                             break;
                         }
-                        todo!("parse_primary_type_expr")
+                        self.eat_doc_comments();
+                        self.expect_token(token!(Identifier))?;
+                        match self.token_tag(self.tok_i) {
+                            token!(Comma) => self.tok_i += 1,
+                            token!(RBrace) => {
+                                self.tok_i += 1;
+                                break;
+                            }
+                            token!(Colon) | token!(RParen) | token!(RBracket) => {
+                                return self.fail_expected(token!(RBrace))
+                            }
+                            _ => self.warn(error!(ExpectedCommaAfterField)),
+                        }
                     }
                     Ok(self.add_node(Node {
                         tag: node!(ErrorSetDecl),
@@ -482,15 +802,46 @@ impl Parser<'_, '_> {
                         },
                     }))
                 }
-                _ => todo!("parse_primary_type_expr"),
+                _ => {
+                    let main_token = self.next_token();
+                    let period = self.eat_token(token!(Period));
+                    if period.is_none() {
+                        self.warn_expected(token!(Period));
+                    }
+                    let identifier = self.eat_token(token!(Identifier));
+                    if identifier.is_none() {
+                        self.warn_expected(token!(Identifier));
+                    }
+                    Ok(self.add_node(Node {
+                        tag: node!(ErrorValue),
+                        main_token,
+                        data: node::Data {
+                            lhs: period.unwrap_or(0),
+                            rhs: identifier.unwrap_or(0),
+                        },
+                    }))
+                }
             },
-            token!(LParen) => todo!("parse_primary_type_expr"),
+            token!(LParen) => {
+                let main_token = self.next_token();
+                let lhs = self.expect_expr()?;
+                let rhs = self.expect_token(token!(RParen))?;
+                Ok(self.add_node(Node {
+                    tag: node!(GroupedExpression),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
             _ => Ok(NULL_NODE),
         }
     }
 
     pub(super) fn expect_primary_type_expr(&mut self) -> Result<node::Index> {
-        todo!("expect_primary_type_expr")
+        let node = self.parse_primary_type_expr()?;
+        if node == 0 {
+            return self.fail(error!(ExpectedPrimaryTypeExpr));
+        }
+        Ok(node)
     }
 
     pub(super) fn parse_builtin_call(&mut self) -> Result<node::Index> {
@@ -564,4 +915,16 @@ impl Parser<'_, '_> {
             }
         }
     }
+}
+
+// https://github.com/rust-lang/rust/issues/94035
+const fn trim_ascii_end(mut bytes: &[u8]) -> &[u8] {
+    while let [rest @ .., last] = bytes {
+        if last.is_ascii_whitespace() {
+            bytes = rest;
+        } else {
+            break;
+        }
+    }
+    bytes
 }
