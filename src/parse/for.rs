@@ -24,12 +24,12 @@ impl Parser<'_, '_> {
             let else_expr = self.expect_expr()?;
             scratch.push(else_expr);
             has_else = true;
-        } else if inputs == 1 {
+        } else if let [lhs] = scratch[..] {
             return Ok(self.add_node(Node {
                 tag: node!(ForSimple),
                 main_token: for_token,
                 data: node::Data {
-                    lhs: scratch[0],
+                    lhs,
                     rhs: then_expr,
                 },
             }));

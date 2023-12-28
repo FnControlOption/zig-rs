@@ -122,7 +122,7 @@ impl Parser<'_, '_> {
         let equal_token = match self.eat_token(token!(Equal)) {
             Some(token) => token,
             None => 'eql: {
-                if lhs_count > 1 {
+                let [lhs] = scratch[..] else {
                     if let Some(tok) = self.eat_token(token!(EqualEqual)) {
                         self.warn_msg(Error {
                             tag: error!(WrongEqualVarDecl),
@@ -132,8 +132,7 @@ impl Parser<'_, '_> {
                         break 'eql tok;
                     }
                     return self.fail_expected(token!(Equal));
-                }
-                let lhs = scratch[0];
+                };
                 match self.node(lhs).tag {
                     node!(GlobalVarDecl)
                     | node!(LocalVarDecl)
@@ -172,8 +171,7 @@ impl Parser<'_, '_> {
         let rhs = self.expect_expr()?;
         self.expect_semicolon(error!(ExpectedSemiAfterStmt), true)?;
 
-        if lhs_count == 1 {
-            let lhs = scratch[0];
+        if let [lhs] = scratch[..] {
             match self.node(lhs).tag {
                 node!(GlobalVarDecl)
                 | node!(LocalVarDecl)
@@ -184,7 +182,23 @@ impl Parser<'_, '_> {
                 }
                 _ => {}
             }
-            todo!("expect_var_decl_expr_statement")
+            let expr = self.add_node(Node {
+                tag: node!(Assign),
+                main_token: equal_token,
+                data: node::Data { lhs, rhs },
+            });
+            if let Some(t) = comptime_token {
+                return Ok(self.add_node(Node {
+                    tag: node!(Comptime),
+                    main_token: t,
+                    data: node::Data {
+                        lhs: expr,
+                        rhs: UNDEFINED_NODE,
+                    },
+                }));
+            } else {
+                return Ok(expr);
+            }
         }
 
         let extra_start = self.extra_data.len();
