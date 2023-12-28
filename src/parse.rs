@@ -16,7 +16,6 @@ mod r#if;
 mod ptr;
 mod statement;
 mod switch;
-mod top_level_decl;
 mod type_expr;
 mod var_decl;
 mod r#while;

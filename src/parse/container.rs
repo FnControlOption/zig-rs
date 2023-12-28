@@ -212,6 +212,136 @@ impl Parser<'_, '_> {
         todo!("find_next_container_member")
     }
 
+    pub(super) fn expect_test_decl(&mut self) -> Result<node::Index> {
+        let test_token = self.assert_token(token!(KeywordTest));
+        let name_token = match self.token_tag(self.tok_i) {
+            token!(StringLiteral) | token!(Identifier) => Some(self.next_token()),
+            _ => None,
+        };
+        let block_node = self.parse_block()?;
+        if block_node == 0 {
+            return self.fail(error!(ExpectedBlock));
+        }
+        Ok(self.add_node(Node {
+            tag: node!(TestDecl),
+            main_token: test_token,
+            data: node::Data {
+                lhs: name_token.unwrap_or(0),
+                rhs: block_node,
+            },
+        }))
+    }
+
+    pub(super) fn expect_test_decl_recoverable(&mut self) -> node::Index {
+        self.expect_test_decl().unwrap_or_else(|err| {
+            assert!(matches!(err, ParseError));
+            self.find_next_container_member();
+            NULL_NODE
+        })
+    }
+
+    pub(super) fn expect_top_level_decl(&mut self) -> Result<node::Index> {
+        let extern_export_inline_token = self.next_token();
+        let mut is_extern = false;
+        let mut expect_fn = false;
+        let mut expect_var_or_fn = false;
+        match self.token_tag(extern_export_inline_token) {
+            token!(KeywordExtern) => {
+                self.eat_token(token!(StringLiteral));
+                is_extern = true;
+                expect_var_or_fn = true;
+            }
+            token!(KeywordExport) => expect_var_or_fn = true,
+            token!(KeywordInline) | token!(KeywordNoinline) => expect_fn = true,
+            _ => self.tok_i -= 1,
+        }
+        let fn_proto = self.parse_fn_proto()?;
+        if fn_proto != 0 {
+            match self.token_tag(self.tok_i) {
+                token!(Semicolon) => {
+                    self.tok_i += 1;
+                    return Ok(fn_proto);
+                }
+                token!(LBrace) => {
+                    if is_extern {
+                        self.warn_msg(Error {
+                            tag: error!(ExternFnBody),
+                            token: extern_export_inline_token,
+                            ..Default::default()
+                        });
+                        return Ok(NULL_NODE);
+                    }
+                    let fn_decl = self.add_node(Node {
+                        tag: node!(FnDecl),
+                        main_token: self.node(fn_proto).main_token,
+                        data: node::Data {
+                            lhs: fn_proto,
+                            rhs: UNDEFINED_NODE,
+                        },
+                    });
+                    let body_block = self.parse_block()?;
+                    assert!(body_block != 0);
+                    self.node_mut(fn_decl).data.rhs = body_block;
+                    return Ok(fn_decl);
+                }
+                _ => {
+                    self.warn(error!(ExpectedSemiOrLBrace));
+                    return Ok(NULL_NODE);
+                }
+            }
+        }
+        if expect_fn {
+            self.warn(error!(ExpectedFn));
+            return Err(ParseError);
+        }
+
+        let thread_local_token = self.eat_token(token!(KeywordThreadlocal));
+        let var_decl = self.parse_global_var_decl()?;
+        if var_decl != 0 {
+            return Ok(var_decl);
+        }
+        if thread_local_token.is_some() {
+            return self.fail(error!(ExpectedVarDecl));
+        }
+        if expect_var_or_fn {
+            return self.fail(error!(ExpectedVarDeclOrFn));
+        }
+        if self.token_tag(self.tok_i) != token!(KeywordUsingnamespace) {
+            return self.fail(error!(ExpectedPubItem));
+        }
+        return self.expect_using_namespace();
+    }
+
+    pub(super) fn expect_top_level_decl_recoverable(&mut self) -> node::Index {
+        self.expect_top_level_decl().unwrap_or_else(|err| {
+            assert!(matches!(err, ParseError));
+            self.find_next_container_member();
+            NULL_NODE
+        })
+    }
+
+    pub(super) fn expect_using_namespace(&mut self) -> Result<node::Index> {
+        let usingnamespace_token = self.assert_token(token!(KeywordUsingnamespace));
+        let expr = self.expect_expr()?;
+        self.expect_semicolon(error!(ExpectedSemiAfterDecl), false)?;
+        Ok(self.add_node(Node {
+            tag: node!(Usingnamespace),
+            main_token: usingnamespace_token,
+            data: node::Data {
+                lhs: expr,
+                rhs: UNDEFINED_NODE,
+            },
+        }))
+    }
+
+    pub(super) fn expect_using_namespace_recoverable(&mut self) -> node::Index {
+        self.expect_using_namespace().unwrap_or_else(|err| {
+            assert!(matches!(err, ParseError));
+            self.find_next_container_member();
+            NULL_NODE
+        })
+    }
+
     pub(super) fn expect_container_field(&mut self) -> Result<node::Index> {
         let mut main_token = self.tok_i;
         self.eat_token(token!(KeywordComptime));

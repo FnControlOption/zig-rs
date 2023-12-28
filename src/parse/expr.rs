@@ -368,4 +368,11 @@ impl Parser<'_, '_> {
             }
         }
     }
+
+    pub(super) fn parse_break_label(&mut self) -> Result<TokenIndex> {
+        match self.eat_token(token!(Colon)) {
+            None => Ok(NULL_NODE),
+            Some(_) => self.expect_token(token!(Identifier)),
+        }
+    }
 }
