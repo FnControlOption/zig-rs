@@ -196,7 +196,7 @@ impl Parser<'_, '_> {
                 rhs,
                 trailing,
             },
-            _ => {
+            [..] => {
                 let span = self.list_to_span(&items);
                 Members {
                     len,

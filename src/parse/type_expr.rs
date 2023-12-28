@@ -364,7 +364,7 @@ impl Parser<'_, '_> {
                     main_token: lparen,
                     data: node::Data { lhs: res, rhs },
                 }),
-                _ => {
+                [..] => {
                     let span = self.list_to_span(&params);
                     let rhs = self.add_extra(node::SubRange { ..span });
                     self.add_node(Node {
@@ -695,7 +695,7 @@ impl Parser<'_, '_> {
                                 main_token: lbrace,
                                 data: node::Data { lhs, rhs },
                             })),
-                            _ => {
+                            [..] => {
                                 let span = self.list_to_span(&inits);
                                 Ok(self.add_node(Node {
                                     tag: match comma {
@@ -753,7 +753,7 @@ impl Parser<'_, '_> {
                             main_token: lbrace,
                             data: node::Data { lhs, rhs: 0 },
                         })),
-                        _ => {
+                        [..] => {
                             let span = self.list_to_span(&inits);
                             Ok(self.add_node(Node {
                                 tag: match comma {
@@ -899,7 +899,7 @@ impl Parser<'_, '_> {
                 main_token: builtin_token,
                 data: node::Data { lhs, rhs },
             })),
-            _ => {
+            [..] => {
                 let span = self.list_to_span(&params);
                 Ok(self.add_node(Node {
                     tag: match comma {

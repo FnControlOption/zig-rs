@@ -78,7 +78,7 @@ impl Parser<'_, '_> {
                 main_token: lbrace,
                 data: node::Data { lhs, rhs },
             })),
-            _ => {
+            [..] => {
                 let span = self.list_to_span(&statements);
                 Ok(self.add_node(Node {
                     tag: (match semicolon {

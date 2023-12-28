@@ -9,11 +9,26 @@ pub struct PtrModifiers {
 
 impl Parser<'_, '_> {
     pub(super) fn parse_ptr_payload(&mut self) -> Result<TokenIndex> {
-        todo!("parse_ptr_payload")
+        if self.eat_token(token!(Pipe)).is_none() {
+            return Ok(NULL_NODE);
+        }
+        self.eat_token(token!(Asterisk));
+        let identifier = self.expect_token(token!(Identifier))?;
+        self.expect_token(token!(Pipe))?;
+        Ok(identifier)
     }
 
     pub(super) fn parse_ptr_index_payload(&mut self) -> Result<TokenIndex> {
-        todo!("parse_ptr_index_payload")
+        if self.eat_token(token!(Pipe)).is_none() {
+            return Ok(NULL_NODE);
+        }
+        self.eat_token(token!(Asterisk));
+        let identifier = self.expect_token(token!(Identifier))?;
+        if self.eat_token(token!(Comma)).is_some() {
+            self.expect_token(token!(Identifier))?;
+        }
+        self.expect_token(token!(Pipe))?;
+        Ok(identifier)
     }
 
     pub(super) fn parse_ptr_modifiers(&mut self) -> Result<PtrModifiers> {

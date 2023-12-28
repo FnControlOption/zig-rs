@@ -162,7 +162,7 @@ impl Parser<'_, '_> {
         Ok(match params[..] {
             [] => SmallSpan::ZeroOrOne(0),
             [param] => SmallSpan::ZeroOrOne(param),
-            _ => SmallSpan::Multi(self.list_to_span(&params)),
+            [..] => SmallSpan::Multi(self.list_to_span(&params)),
         })
     }
 }

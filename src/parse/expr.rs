@@ -354,7 +354,7 @@ impl Parser<'_, '_> {
                 main_token: lbrace,
                 data: node::Data { lhs, rhs },
             })),
-            _ => {
+            [..] => {
                 let span = self.list_to_span(&inits);
                 let rhs = self.add_extra(span);
                 Ok(self.add_node(Node {
