@@ -130,8 +130,4 @@ impl Parser<'_, '_> {
         self.expect_token(token!(RParen))?;
         Ok(expr)
     }
-
-    pub(super) fn parse_builtin_call(&mut self) -> Result<node::Index> {
-        todo!("parse_builtin_call")
-    }
 }

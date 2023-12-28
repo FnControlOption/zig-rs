@@ -159,9 +159,9 @@ impl Parser<'_, '_> {
                 ..Default::default()
             });
         }
-        Ok(match params.len() {
-            0 => SmallSpan::ZeroOrOne(0),
-            1 => SmallSpan::ZeroOrOne(params[0]),
+        Ok(match params[..] {
+            [] => SmallSpan::ZeroOrOne(0),
+            [param] => SmallSpan::ZeroOrOne(param),
             _ => SmallSpan::Multi(self.list_to_span(&params)),
         })
     }

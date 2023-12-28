@@ -56,33 +56,27 @@ impl Parser<'_, '_> {
         }
         self.expect_token(token!(RBrace))?;
         let semicolon = self.token_tag(self.tok_i - 2) == token!(Semicolon);
-        match statements.len() {
-            0 => Ok(self.add_node(Node {
+        match statements[..] {
+            [] => Ok(self.add_node(Node {
                 tag: node!(BlockTwo),
                 main_token: lbrace,
                 data: node::Data { lhs: 0, rhs: 0 },
             })),
-            1 => Ok(self.add_node(Node {
+            [lhs] => Ok(self.add_node(Node {
                 tag: (match semicolon {
                     true => node!(BlockTwoSemicolon),
                     false => node!(BlockTwo),
                 }),
                 main_token: lbrace,
-                data: node::Data {
-                    lhs: statements[0],
-                    rhs: 0,
-                },
+                data: node::Data { lhs, rhs: 0 },
             })),
-            2 => Ok(self.add_node(Node {
+            [lhs, rhs] => Ok(self.add_node(Node {
                 tag: (match semicolon {
                     true => node!(BlockTwoSemicolon),
                     false => node!(BlockTwo),
                 }),
                 main_token: lbrace,
-                data: node::Data {
-                    lhs: statements[0],
-                    rhs: statements[1],
-                },
+                data: node::Data { lhs, rhs },
             })),
             _ => {
                 let span = self.list_to_span(&statements);

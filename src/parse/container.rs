@@ -176,26 +176,27 @@ impl Parser<'_, '_> {
             }
         }
 
-        match items.len() {
-            0 => Members {
-                len: 0,
+        let len = items.len();
+        match items[..] {
+            [] => Members {
+                len,
                 lhs: 0,
                 rhs: 0,
                 trailing,
             },
-            1 => Members {
-                len: 1,
-                lhs: items[0],
+            [lhs] => Members {
+                len,
+                lhs,
                 rhs: 0,
                 trailing,
             },
-            2 => Members {
-                len: 2,
-                lhs: items[0],
-                rhs: items[1],
+            [lhs, rhs] => Members {
+                len,
+                lhs,
+                rhs,
                 trailing,
             },
-            len => {
+            _ => {
                 let span = self.list_to_span(&items);
                 Members {
                     len,

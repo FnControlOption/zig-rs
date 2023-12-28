@@ -107,6 +107,198 @@ impl Parser<'_, '_> {
         Ok(node)
     }
 
+    pub(super) fn parse_error_union_expr(&mut self) -> Result<node::Index> {
+        let suffix_expr = self.parse_suffix_expr()?;
+        if suffix_expr == 0 {
+            return Ok(NULL_NODE);
+        }
+        let Some(bang) = self.eat_token(token!(Bang)) else {
+            return Ok(suffix_expr);
+        };
+        let rhs = self.expect_type_expr()?;
+        Ok(self.add_node(Node {
+            tag: node!(ErrorUnion),
+            main_token: bang,
+            data: node::Data {
+                lhs: suffix_expr,
+                rhs,
+            },
+        }))
+    }
+
+    pub(super) fn parse_suffix_expr(&mut self) -> Result<node::Index> {
+        if self.eat_token(token!(KeywordAsync)).is_some() {
+            todo!("parse_suffix_expr");
+        }
+
+        let mut res = self.parse_primary_type_expr()?;
+        if res == 0 {
+            return Ok(res);
+        }
+        loop {
+            let suffix_op = self.parse_suffix_op(res)?;
+            if suffix_op != 0 {
+                res = suffix_op;
+                continue;
+            }
+            let Some(lparen) = self.eat_token(token!(LParen)) else {
+                return Ok(res);
+            };
+            let mut params = Vec::new();
+            loop {
+                if self.eat_token(token!(RParen)).is_some() {
+                    break;
+                }
+                let param = self.expect_expr()?;
+                params.push(param);
+                match self.token_tag(self.tok_i) {
+                    token!(Comma) => self.tok_i += 1,
+                    token!(RParen) => {
+                        self.tok_i += 1;
+                        break;
+                    }
+                    token!(Colon) | token!(RBrace) | token!(RBracket) => {
+                        return self.fail_expected(token!(RParen))
+                    }
+                    _ => self.warn(error!(ExpectedCommaAfterArg)),
+                }
+            }
+            let comma = self.token_tag(self.tok_i - 2) == token!(Comma);
+            res = match params[..] {
+                [] => self.add_node(Node {
+                    tag: match comma {
+                        true => node!(CallOneComma),
+                        false => node!(CallOne),
+                    },
+                    main_token: lparen,
+                    data: node::Data { lhs: res, rhs: 0 },
+                }),
+                [rhs] => self.add_node(Node {
+                    tag: match comma {
+                        true => node!(CallOneComma),
+                        false => node!(CallOne),
+                    },
+                    main_token: lparen,
+                    data: node::Data { lhs: res, rhs },
+                }),
+                _ => {
+                    let span = self.list_to_span(&params);
+                    let rhs = self.add_extra(node::SubRange { ..span });
+                    self.add_node(Node {
+                        tag: match comma {
+                            true => node!(CallComma),
+                            false => node!(Call),
+                        },
+                        main_token: lparen,
+                        data: node::Data { lhs: res, rhs: rhs },
+                    })
+                }
+            }
+        }
+    }
+
+    pub(super) fn parse_suffix_op(&mut self, lhs: node::Index) -> Result<node::Index> {
+        match self.token_tag(self.tok_i) {
+            token!(LBracket) => {
+                let lbracket = self.next_token();
+                let index_expr = self.expect_expr()?;
+
+                if self.eat_token(token!(Ellipsis2)).is_some() {
+                    let end_expr = self.parse_expr()?;
+                    if self.eat_token(token!(Colon)).is_some() {
+                        let sentinel = self.expect_expr()?;
+                        self.expect_token(token!(RBracket))?;
+                        let rhs = self.add_extra(node::SliceSentinel {
+                            start: index_expr,
+                            end: end_expr,
+                            sentinel,
+                        });
+                        return Ok(self.add_node(Node {
+                            tag: node!(SliceSentinel),
+                            main_token: lbracket,
+                            data: node::Data { lhs, rhs },
+                        }));
+                    }
+                    self.expect_token(token!(RBracket))?;
+                    if end_expr == 0 {
+                        return Ok(self.add_node(Node {
+                            tag: node!(SliceOpen),
+                            main_token: lbracket,
+                            data: node::Data {
+                                lhs,
+                                rhs: index_expr,
+                            },
+                        }));
+                    }
+                    let rhs = self.add_extra(node::Slice {
+                        start: index_expr,
+                        end: end_expr,
+                    });
+                    return Ok(self.add_node(Node {
+                        tag: node!(Slice),
+                        main_token: lbracket,
+                        data: node::Data { lhs, rhs },
+                    }));
+                }
+                self.expect_token(token!(RBracket))?;
+                Ok(self.add_node(Node {
+                    tag: node!(ArrayAccess),
+                    main_token: lbracket,
+                    data: node::Data {
+                        lhs,
+                        rhs: index_expr,
+                    },
+                }))
+            }
+            token!(PeriodAsterisk) => {
+                let main_token = self.next_token();
+                let rhs = UNDEFINED_NODE;
+                Ok(self.add_node(Node {
+                    tag: node!(Deref),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
+            token!(InvalidPeriodAsterisks) => {
+                self.warn(error!(AsteriskAfterPtrDeref));
+                let main_token = self.next_token();
+                let rhs = UNDEFINED_NODE;
+                Ok(self.add_node(Node {
+                    tag: node!(Deref),
+                    main_token,
+                    data: node::Data { lhs, rhs },
+                }))
+            }
+            token!(Period) => match self.token_tag(self.tok_i + 1) {
+                token!(Identifier) => {
+                    let main_token = self.next_token();
+                    let rhs = self.next_token();
+                    Ok(self.add_node(Node {
+                        tag: node!(FieldAccess),
+                        main_token,
+                        data: node::Data { lhs, rhs },
+                    }))
+                }
+                token!(QuestionMark) => {
+                    let main_token = self.next_token();
+                    let rhs = self.next_token();
+                    Ok(self.add_node(Node {
+                        tag: node!(UnwrapOptional),
+                        main_token,
+                        data: node::Data { lhs, rhs },
+                    }))
+                }
+                token!(LBrace) => Ok(NULL_NODE),
+                _ => {
+                    self.tok_i += 1;
+                    self.warn(error!(ExpectedSuffixOp));
+                    Ok(NULL_NODE)
+                }
+            },
+            _ => Ok(NULL_NODE),
+        }
+    }
+
     pub(super) fn parse_primary_type_expr(&mut self) -> Result<node::Index> {
         match self.token_tag(self.tok_i) {
             token!(CharLiteral) => {
@@ -234,20 +426,17 @@ impl Parser<'_, '_> {
                             inits.push(next);
                         }
                         let comma = self.token_tag(self.tok_i - 2) == token!(Comma);
-                        return match inits.len() {
-                            0 => unreachable!(),
-                            1 => Ok(self.add_node(Node {
+                        return match inits[..] {
+                            [] => unreachable!(),
+                            [lhs] => Ok(self.add_node(Node {
                                 tag: match comma {
                                     true => node!(StructInitDotTwoComma),
                                     false => node!(StructInitDotTwo),
                                 },
                                 main_token: lbrace,
-                                data: node::Data {
-                                    lhs: inits[0],
-                                    rhs: 0,
-                                },
+                                data: node::Data { lhs, rhs: 0 },
                             })),
-                            2 => todo!("parse_primary_type_expr"),
+                            [_, _] => todo!("parse_primary_type_expr"),
                             _ => todo!("parse_primary_type_expr"),
                         };
                     }
@@ -261,14 +450,14 @@ impl Parser<'_, '_> {
                         todo!("parse_primary_type_expr");
                     }
                     let comma = self.token_tag(self.tok_i - 2) == token!(Comma);
-                    match inits.len() {
-                        0 => Ok(self.add_node(Node {
+                    match inits[..] {
+                        [] => Ok(self.add_node(Node {
                             tag: node!(StructInitDotTwo),
                             main_token: lbrace,
                             data: node::Data { lhs: 0, rhs: 0 },
                         })),
-                        1 => todo!("parse_primary_type_expr"),
-                        2 => todo!("parse_primary_type_expr"),
+                        [_] => todo!("parse_primary_type_expr"),
+                        [_, _] => todo!("parse_primary_type_expr"),
                         _ => todo!("parse_primary_type_expr"),
                     }
                 }
@@ -302,5 +491,77 @@ impl Parser<'_, '_> {
 
     pub(super) fn expect_primary_type_expr(&mut self) -> Result<node::Index> {
         todo!("expect_primary_type_expr")
+    }
+
+    pub(super) fn parse_builtin_call(&mut self) -> Result<node::Index> {
+        let builtin_token = self.assert_token(token!(Builtin));
+        if self.eat_token(token!(LParen)).is_none() {
+            self.warn(error!(ExpectedParamList));
+            return Ok(self.add_node(Node {
+                tag: node!(Identifier),
+                main_token: builtin_token,
+                data: node::Data {
+                    lhs: UNDEFINED_NODE,
+                    rhs: UNDEFINED_NODE,
+                },
+            }));
+        }
+        let mut params = Vec::new();
+        loop {
+            if self.eat_token(token!(RParen)).is_some() {
+                break;
+            }
+            let param = self.expect_expr()?;
+            params.push(param);
+            match self.token_tag(self.tok_i) {
+                token!(Comma) => self.tok_i += 1,
+                token!(RParen) => {
+                    self.tok_i += 1;
+                    break;
+                }
+                _ => self.warn(error!(ExpectedCommaAfterArg)),
+            }
+        }
+        let comma = self.token_tag(self.tok_i - 2) == token!(Comma);
+        match params[..] {
+            [] => Ok(self.add_node(Node {
+                tag: match comma {
+                    true => node!(BuiltinCallTwoComma),
+                    false => node!(BuiltinCallTwo),
+                },
+                main_token: builtin_token,
+                data: node::Data { lhs: 0, rhs: 0 },
+            })),
+            [lhs] => Ok(self.add_node(Node {
+                tag: match comma {
+                    true => node!(BuiltinCallTwoComma),
+                    false => node!(BuiltinCallTwo),
+                },
+                main_token: builtin_token,
+                data: node::Data { lhs, rhs: 0 },
+            })),
+            [lhs, rhs] => Ok(self.add_node(Node {
+                tag: match comma {
+                    true => node!(BuiltinCallTwoComma),
+                    false => node!(BuiltinCallTwo),
+                },
+                main_token: builtin_token,
+                data: node::Data { lhs, rhs },
+            })),
+            _ => {
+                let span = self.list_to_span(&params);
+                Ok(self.add_node(Node {
+                    tag: match comma {
+                        true => node!(BuiltinCallComma),
+                        false => node!(BuiltinCall),
+                    },
+                    main_token: builtin_token,
+                    data: node::Data {
+                        lhs: span.start,
+                        rhs: span.end,
+                    },
+                }))
+            }
+        }
     }
 }
