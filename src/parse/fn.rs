@@ -39,7 +39,7 @@ impl Parser<'_, '_> {
                     },
                 },
                 SmallSpan::Multi(span) => {
-                    let lhs = self.add_extra(node::SubRange { ..span });
+                    let lhs = self.add_extra(span);
                     Node {
                         tag: node!(FnProtoMulti),
                         main_token: fn_token,

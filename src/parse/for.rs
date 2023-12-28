@@ -6,7 +6,63 @@ impl Parser<'_, '_> {
             return Ok(NULL_NODE);
         };
 
-        todo!("parse_for_statement")
+        let mut scratch = Vec::new();
+        let inputs = self.for_prefix(&mut scratch)?;
+
+        let mut else_required = false;
+        let mut seen_semicolon = false;
+        let then_expr = 'blk: {
+            let block_expr = self.parse_block_expr()?;
+            if block_expr != 0 {
+                break 'blk block_expr;
+            }
+            let assign_expr = self.parse_assign_expr()?;
+            if assign_expr == 0 {
+                return self.fail(error!(ExpectedBlockOrAssignment));
+            }
+            if self.eat_token(token!(Semicolon)).is_some() {
+                seen_semicolon = true;
+                break 'blk assign_expr;
+            }
+            else_required = true;
+            assign_expr
+        };
+        let mut has_else = false;
+        if !seen_semicolon && self.eat_token(token!(KeywordElse)).is_some() {
+            scratch.push(then_expr);
+            let else_stmt = self.expect_statement(false)?;
+            scratch.push(else_stmt);
+            has_else = true;
+        } else if let [lhs] = scratch[..] {
+            if else_required {
+                self.warn(error!(ExpectedSemiOrElse));
+            }
+            return Ok(self.add_node(Node {
+                tag: node!(ForSimple),
+                main_token: for_token,
+                data: node::Data {
+                    lhs,
+                    rhs: then_expr,
+                },
+            }));
+        } else {
+            if else_required {
+                self.warn(error!(ExpectedSemiOrElse));
+            }
+            scratch.push(then_expr);
+        }
+        let lhs = self.list_to_span(&scratch).start;
+        let rhs = {
+            let mut extra = node::For(UNDEFINED_NODE);
+            extra.set_inputs(inputs as u32);
+            extra.set_has_else(has_else);
+            extra.0
+        };
+        Ok(self.add_node(Node {
+            tag: node!(For),
+            main_token: for_token,
+            data: node::Data { lhs, rhs },
+        }))
     }
 
     pub(super) fn for_prefix(&mut self, scratch: &mut Vec<node::Index>) -> Result<usize> {

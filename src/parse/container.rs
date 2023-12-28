@@ -60,7 +60,84 @@ impl Parser<'_, '_> {
                     }
                     trailing = false;
                 }
-                token!(KeywordComptime) => todo!("parse_container_members"),
+                token!(KeywordComptime) => match self.token_tag(self.tok_i + 1) {
+                    token!(LBrace) => {
+                        if let Some(some) = doc_comment {
+                            self.warn_msg(Error {
+                                tag: error!(ComptimeDocComment),
+                                token: some,
+                                ..Default::default()
+                            });
+                        }
+                        let comptime_token = self.next_token();
+                        let block = self.parse_block().unwrap_or_else(|err| {
+                            assert!(matches!(err, ParseError));
+                            self.find_next_container_member();
+                            NULL_NODE
+                        });
+                        if block != 0 {
+                            let comptime_node = self.add_node(Node {
+                                tag: node!(Comptime),
+                                main_token: comptime_token,
+                                data: node::Data {
+                                    lhs: block,
+                                    rhs: UNDEFINED_NODE,
+                                },
+                            });
+                            if matches!(field_state, FieldState::Seen) {
+                                field_state = FieldState::End(comptime_node);
+                            }
+                            items.push(comptime_node);
+                        }
+                        trailing = false;
+                    }
+                    _ => {
+                        let identifier = self.tok_i;
+                        let Ok(container_field) = self.expect_container_field() else {
+                            self.find_next_container_member();
+                            continue;
+                        };
+                        match field_state {
+                            FieldState::None => field_state = FieldState::Seen,
+                            FieldState::Err | FieldState::Seen => {}
+                            FieldState::End(node) => {
+                                self.warn_msg(Error {
+                                    tag: error!(DeclBetweenFields),
+                                    token: self.node(node).main_token,
+                                    ..Default::default()
+                                });
+                                self.warn_msg(Error {
+                                    tag: error!(PreviousField),
+                                    is_note: true,
+                                    token: last_field,
+                                    ..Default::default()
+                                });
+                                self.warn_msg(Error {
+                                    tag: error!(NextField),
+                                    is_note: true,
+                                    token: identifier,
+                                    ..Default::default()
+                                });
+                                field_state = FieldState::Err;
+                            }
+                        }
+                        items.push(container_field);
+                        match self.token_tag(self.tok_i) {
+                            token!(Comma) => {
+                                self.tok_i += 1;
+                                trailing = true;
+                                continue;
+                            }
+                            token!(RBrace) | token!(Eof) => {
+                                trailing = false;
+                                break;
+                            }
+                            _ => {}
+                        }
+                        self.warn(error!(ExpectedCommaAfterField));
+                        self.find_next_container_member();
+                    }
+                },
                 token!(KeywordPub) => {
                     self.tok_i += 1;
                     let top_level_decl = self.expect_top_level_decl_recoverable();
@@ -442,7 +519,69 @@ impl Parser<'_, '_> {
                 None => NULL_NODE,
             },
             token!(KeywordUnion) => match self.eat_token(token!(LParen)) {
-                Some(_) => todo!("parse_container_decl_auto"),
+                Some(_) => match self.eat_token(token!(KeywordEnum)) {
+                    Some(_) => match self.eat_token(token!(LParen)) {
+                        Some(_) => {
+                            let enum_tag_expr = self.expect_expr()?;
+                            self.expect_token(token!(RParen))?;
+                            self.expect_token(token!(RParen))?;
+
+                            self.expect_token(token!(LBrace))?;
+                            let members = self.parse_container_members();
+                            let members_span = members.to_span(self);
+                            self.expect_token(token!(RBrace))?;
+
+                            let lhs = enum_tag_expr;
+                            let rhs = self.add_extra(members_span);
+                            self.add_node(Node {
+                                tag: match members.trailing {
+                                    true => node!(TaggedUnionEnumTagTrailing),
+                                    false => node!(TaggedUnionEnumTag),
+                                },
+                                main_token,
+                                data: node::Data { lhs, rhs },
+                            })
+                        }
+                        None => {
+                            self.expect_token(token!(RParen))?;
+
+                            self.expect_token(token!(LBrace))?;
+                            let members = self.parse_container_members();
+                            self.expect_token(token!(RBrace))?;
+                            if members.len <= 2 {
+                                self.add_node(Node {
+                                    tag: match members.trailing {
+                                        true => node!(TaggedUnionTwoTrailing),
+                                        false => node!(TaggedUnionTwo),
+                                    },
+                                    main_token,
+                                    data: node::Data {
+                                        lhs: members.lhs,
+                                        rhs: members.rhs,
+                                    },
+                                })
+                            } else {
+                                let span = members.to_span(self);
+                                self.add_node(Node {
+                                    tag: match members.trailing {
+                                        true => node!(TaggedUnionTrailing),
+                                        false => node!(TaggedUnion),
+                                    },
+                                    main_token,
+                                    data: node::Data {
+                                        lhs: span.start,
+                                        rhs: span.end,
+                                    },
+                                })
+                            }
+                        }
+                    },
+                    None => {
+                        let expr = self.expect_expr()?;
+                        self.expect_token(token!(RParen))?;
+                        expr
+                    }
+                },
                 None => NULL_NODE,
             },
             _ => {
@@ -483,7 +622,7 @@ impl Parser<'_, '_> {
             }
         } else {
             let span = members.to_span(self);
-            let rhs = self.add_extra(node::SubRange { ..span });
+            let rhs = self.add_extra(span);
             return Ok(self.add_node(Node {
                 tag: match members.trailing {
                     true => node!(ContainerDeclArgTrailing),

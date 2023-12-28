@@ -318,7 +318,48 @@ impl Parser<'_, '_> {
         let field_init = self.parse_field_init()?;
         if field_init != 0 {
             inits.push(field_init);
-            todo!("parse_curly_suffix_expr")
+            loop {
+                match self.token_tag(self.tok_i) {
+                    token!(Comma) => self.tok_i += 1,
+                    token!(RBrace) => {
+                        self.tok_i += 1;
+                        break;
+                    }
+                    token!(Colon) | token!(RParen) | token!(RBracket) => {
+                        return self.fail_expected(token!(RBrace));
+                    }
+                    _ => self.warn(error!(ExpectedCommaAfterInitializer)),
+                }
+                if self.eat_token(token!(RBrace)).is_some() {
+                    break;
+                }
+                let next = self.expect_field_init()?;
+                inits.push(next);
+            }
+            let comma = self.token_tag(self.tok_i - 2) == token!(Comma);
+            return match inits[..] {
+                [] => unreachable!(),
+                [rhs] => Ok(self.add_node(Node {
+                    tag: match comma {
+                        true => node!(StructInitOneComma),
+                        false => node!(StructInitOne),
+                    },
+                    main_token: lbrace,
+                    data: node::Data { lhs, rhs },
+                })),
+                [..] => {
+                    let span = self.list_to_span(&inits);
+                    let rhs = self.add_extra(span);
+                    Ok(self.add_node(Node {
+                        tag: match comma {
+                            true => node!(StructInitComma),
+                            false => node!(StructInit),
+                        },
+                        main_token: lbrace,
+                        data: node::Data { lhs, rhs },
+                    }))
+                }
+            };
         }
 
         loop {

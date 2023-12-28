@@ -311,7 +311,68 @@ impl Parser<'_, '_> {
 
     pub(super) fn parse_suffix_expr(&mut self) -> Result<node::Index> {
         if self.eat_token(token!(KeywordAsync)).is_some() {
-            todo!("parse_suffix_expr");
+            let mut res = self.expect_primary_type_expr()?;
+            loop {
+                let node = self.parse_suffix_op(res)?;
+                if node == 0 {
+                    break;
+                }
+                res = node;
+            }
+            let Some(lparen) = self.eat_token(token!(LParen)) else {
+                self.warn(error!(ExpectedParamList));
+                return Ok(res);
+            };
+            let mut params = Vec::new();
+            loop {
+                if self.eat_token(token!(RParen)).is_some() {
+                    break;
+                }
+                let param = self.expect_expr()?;
+                params.push(param);
+                match self.token_tag(self.tok_i) {
+                    token!(Comma) => self.tok_i += 1,
+                    token!(RParen) => {
+                        self.tok_i += 1;
+                        break;
+                    }
+                    token!(Colon) | token!(RBrace) | token!(RBracket) => {
+                        return self.fail_expected(token!(RParen))
+                    }
+                    _ => self.warn(error!(ExpectedCommaAfterArg)),
+                }
+            }
+            let comma = self.token_tag(self.tok_i - 2) == token!(Comma);
+            return Ok(match params[..] {
+                [] => self.add_node(Node {
+                    tag: match comma {
+                        true => node!(AsyncCallOneComma),
+                        false => node!(AsyncCallOne),
+                    },
+                    main_token: lparen,
+                    data: node::Data { lhs: res, rhs: 0 },
+                }),
+                [rhs] => self.add_node(Node {
+                    tag: match comma {
+                        true => node!(AsyncCallOneComma),
+                        false => node!(AsyncCallOne),
+                    },
+                    main_token: lparen,
+                    data: node::Data { lhs: res, rhs },
+                }),
+                [..] => {
+                    let span = self.list_to_span(&params);
+                    let rhs = self.add_extra(span);
+                    self.add_node(Node {
+                        tag: match comma {
+                            true => node!(AsyncCallComma),
+                            false => node!(AsyncCall),
+                        },
+                        main_token: lparen,
+                        data: node::Data { lhs: res, rhs },
+                    })
+                }
+            });
         }
 
         let mut res = self.parse_primary_type_expr()?;
@@ -366,14 +427,14 @@ impl Parser<'_, '_> {
                 }),
                 [..] => {
                     let span = self.list_to_span(&params);
-                    let rhs = self.add_extra(node::SubRange { ..span });
+                    let rhs = self.add_extra(span);
                     self.add_node(Node {
                         tag: match comma {
                             true => node!(CallComma),
                             false => node!(Call),
                         },
                         main_token: lparen,
-                        data: node::Data { lhs: res, rhs: rhs },
+                        data: node::Data { lhs: res, rhs },
                     })
                 }
             }
