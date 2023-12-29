@@ -2,6 +2,12 @@ use crate::parse::Parser;
 use crate::token;
 use crate::Tokenizer;
 
+pub mod visitor;
+pub use visitor::Visitor;
+
+pub mod display;
+pub use display::Display;
+
 #[cfg(test)]
 mod tests;
 
@@ -572,8 +578,3 @@ pub mod node;
 pub use node::Node;
 
 use self::node::ExtraData;
-
-pub mod visitor;
-pub use visitor::Visitor;
-
-mod debug;

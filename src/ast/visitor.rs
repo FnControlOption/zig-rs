@@ -15,9 +15,23 @@ pub trait Visitor: Sized {
         node.accept(tree, self)
     }
 
-    fn mode(&mut self) -> Mode {
-        Mode::Zig
+    fn accept_child(&mut self, tree: &Ast, index: node::Index) {
+        if index != 0 {
+            self.accept(tree, tree.node(index));
+        }
     }
+
+    fn accept_extra_child(&mut self, tree: &Ast, index: node::Index) {
+        self.accept_child(tree, tree.extra_data(index));
+    }
+
+    fn accept_extra_children(&mut self, tree: &Ast, range: std::ops::Range<node::Index>) {
+        for index in range {
+            self.accept_extra_child(tree, index);
+        }
+    }
+
+    fn accept_token(&mut self, tree: &Ast, index: TokenIndex) {}
 }
 
 impl Ast<'_> {
@@ -39,19 +53,19 @@ impl Node {
 
     pub fn accept_children(&self, tree: &Ast, visitor: &mut impl Visitor) {
         let node::Data { lhs, rhs } = self.data;
-        match get_data_types(visitor.mode(), self.tag) {
-            PairType::SubList => accept_children(tree, lhs..rhs, visitor),
+        match get_data_types(tree.mode, self.tag) {
+            PairType::SubList => visitor.accept_extra_children(tree, lhs..rhs),
             PairType::Pair(lhs_type, rhs_type) => {
                 for (data, data_type) in [(lhs, lhs_type), (rhs, rhs_type)] {
                     match data_type {
                         DataType::Unused => {}
-                        DataType::Node => accept_child(tree, data, visitor),
-                        DataType::Token => {}
+                        DataType::Node => visitor.accept_child(tree, data),
+                        DataType::Token => visitor.accept_token(tree, data),
                         DataType::NodeSlice => {
                             let count: node::Index = tree.extra_data(data);
                             let start = data + 1;
                             let end = start + count;
-                            accept_children(tree, start..end, visitor);
+                            visitor.accept_extra_children(tree, start..end);
                         }
                         DataType::Extra(extra_data_type) => {
                             extra_data_type.accept_children(tree, data, visitor);
@@ -63,52 +77,38 @@ impl Node {
                 let extra = node::For(rhs);
                 let inputs = extra.get_inputs();
                 let has_else = extra.get_has_else();
-                accept_children(tree, lhs..lhs + inputs, visitor);
-                accept_child(tree, tree.extra_data(lhs + inputs), visitor);
+                visitor.accept_extra_children(tree, lhs..lhs + inputs);
+                visitor.accept_extra_child(tree, lhs + inputs);
                 if has_else {
-                    accept_child(tree, tree.extra_data(lhs + inputs + 1), visitor);
+                    visitor.accept_extra_child(tree, lhs + inputs + 1);
+                } else {
+                    visitor.accept_child(tree, 0);
                 }
             }
         };
     }
 }
 
-pub fn accept_child(tree: &Ast, index: node::Index, visitor: &mut impl Visitor) {
-    if index != 0 {
-        tree.node(index).accept(tree, visitor);
-    }
-}
-
-pub fn accept_children(
-    tree: &Ast,
-    range: std::ops::Range<node::Index>,
-    visitor: &mut impl Visitor,
-) {
-    for extra_index in range {
-        let node_index = tree.extra_data(extra_index);
-        accept_child(tree, node_index, visitor);
-    }
-}
-
 impl node::SubRange {
     pub fn accept_children(&self, tree: &Ast, visitor: &mut impl Visitor) {
-        accept_children(tree, self.start..self.end, visitor)
+        visitor.accept_extra_children(tree, self.start..self.end)
     }
 }
 
 impl node::FnProto {
     pub fn accept_children(&self, tree: &Ast, visitor: &mut impl Visitor) {
-        accept_children(tree, self.params_start..self.params_end, visitor);
-        accept_child(tree, self.align_expr, visitor);
-        accept_child(tree, self.addrspace_expr, visitor);
-        accept_child(tree, self.section_expr, visitor);
-        accept_child(tree, self.callconv_expr, visitor);
+        visitor.accept_extra_children(tree, self.params_start..self.params_end);
+        visitor.accept_child(tree, self.align_expr);
+        visitor.accept_child(tree, self.addrspace_expr);
+        visitor.accept_child(tree, self.section_expr);
+        visitor.accept_child(tree, self.callconv_expr);
     }
 }
 
 impl node::Asm {
     pub fn accept_children(&self, tree: &Ast, visitor: &mut impl Visitor) {
-        accept_children(tree, self.items_start..self.items_end, visitor);
+        visitor.accept_extra_children(tree, self.items_start..self.items_end);
+        visitor.accept_token(tree, self.rparen);
     }
 }
 
@@ -126,7 +126,7 @@ macro_rules! extra_data_impl {
     ($type:ident, $($field:ident),*) => {
         impl crate::ast::node::$type {
             pub(crate) fn accept_all_fields_as_children(&self, tree: &crate::Ast, visitor: &mut impl Visitor) {
-                $(crate::ast::visitor::accept_child(tree, self.$field, visitor);)*
+                $(visitor.accept_child(tree, self.$field);)*
             }
         }
     };

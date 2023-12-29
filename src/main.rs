@@ -1,30 +1,11 @@
+#![allow(dead_code)]
+#![allow(unreachable_code)]
+#![allow(unused_assignments)]
+#![allow(unused_imports)]
+#![allow(unused_mut)]
 #![allow(unused_variables)]
 
 use zig::*;
-
-struct AstVisitor {
-    depth: usize,
-}
-
-impl ast::Visitor for AstVisitor {
-    fn visit(&mut self, tree: &Ast, node: &ast::Node) -> bool {
-        let location = tree.token_location(0, node.main_token);
-        println!(
-            "{}{:?} (:{}:{}) {}",
-            " ".repeat(self.depth * 2),
-            node.tag,
-            location.line + 1,
-            location.column + 1,
-            String::from_utf8_lossy(tree.token_slice(node.main_token)),
-        );
-        self.depth += 1;
-        true
-    }
-
-    fn end_visit(&mut self, tree: &Ast, node: &ast::Node) {
-        self.depth -= 1;
-    }
-}
 
 fn main() {
     let home = std::env::var("HOME").unwrap();
@@ -36,7 +17,7 @@ fn main() {
         recurse(root, dir).unwrap();
         return;
     }
-    let filename = "lib/std/unicode/throughput_test.zig";
+    let filename = "lib/std/zig/Parse.zig";
     let path = format!("{home}/Documents/zig/{filename}");
     let source = std::fs::read_to_string(&path).unwrap();
     let filename = "-e";
@@ -52,11 +33,9 @@ fn main() {
         }
     }
     let tree = run(filename, &source);
-    let mut visitor = AstVisitor { depth: 0 };
-    tree.accept(&mut visitor);
-    // if tree.errors.is_empty() {
-    //     print!("{tree:?}");
-    // }
+    if tree.errors.is_empty() {
+        print!("{}", tree.display());
+    }
 }
 
 fn run<'src>(filename: &str, source: &'src str) -> Ast<'src> {
