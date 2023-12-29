@@ -2,9 +2,33 @@
 
 use zig::*;
 
+struct AstVisitor {
+    depth: usize,
+}
+
+impl ast::Visitor for AstVisitor {
+    fn visit(&mut self, tree: &Ast, node: &ast::Node) -> bool {
+        let location = tree.token_location(0, node.main_token);
+        println!(
+            "{}{:?} (:{}:{}) {}",
+            " ".repeat(self.depth * 2),
+            node.tag,
+            location.line + 1,
+            location.column + 1,
+            String::from_utf8_lossy(tree.token_slice(node.main_token)),
+        );
+        self.depth += 1;
+        true
+    }
+
+    fn end_visit(&mut self, tree: &Ast, node: &ast::Node) {
+        self.depth -= 1;
+    }
+}
+
 fn main() {
     let home = std::env::var("HOME").unwrap();
-    if true {
+    if false {
         let root = format!("{home}/Documents/zig");
         let dir = format!("{root}/lib/std");
         let dir = format!("{root}/src");
@@ -28,6 +52,8 @@ fn main() {
         }
     }
     let tree = run(filename, &source);
+    let mut visitor = AstVisitor { depth: 0 };
+    tree.accept(&mut visitor);
     // if tree.errors.is_empty() {
     //     print!("{tree:?}");
     // }

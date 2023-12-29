@@ -5,3 +5,7 @@ edition = "2021"
 
 [dependencies]
 bitfield = "0.14.0"
+
+[workspace]
+members = [".", "./zig-lsp"]
+default-members = ["."]

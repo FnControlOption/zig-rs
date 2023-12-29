@@ -525,6 +525,7 @@ macro_rules! extra_data {
         }
 
         debug::extra_data_impl!($type, $($field),*);
+        visitor::extra_data_impl!($type, $($field),*);
     };
 }
 

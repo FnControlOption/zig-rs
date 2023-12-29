@@ -1,0 +1,10 @@
+[package]
+name = "zig-lsp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "f1d318a" }
+tokio = { version = "1", features = ["full"] }
+tower-lsp = "0.20.0"
+zig = { path = ".." }

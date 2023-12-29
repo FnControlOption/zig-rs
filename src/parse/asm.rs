@@ -79,18 +79,19 @@ impl Parser<'_, '_> {
         self.expect_token(token!(RBracket))?;
         self.expect_token(token!(StringLiteral))?;
         self.expect_token(token!(LParen))?;
-        let type_expr = if self.eat_token(token!(Arrow)).is_some() {
-            Some(self.expect_type_expr()?)
-        } else {
-            self.expect_token(token!(Identifier))?;
-            None
+        let type_expr = match self.eat_token(token!(Arrow)) {
+            Some(_) => self.expect_type_expr()?,
+            None => {
+                self.expect_token(token!(Identifier))?;
+                NULL_NODE
+            }
         };
         let rparen = self.expect_token(token!(RParen))?;
         Ok(self.add_node(Node {
             tag: node!(AsmOutput),
             main_token: identifier,
             data: node::Data {
-                lhs: type_expr.unwrap_or(NULL_NODE),
+                lhs: type_expr,
                 rhs: rparen,
             },
         }))
