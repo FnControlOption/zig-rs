@@ -65,7 +65,7 @@ fn keywords() -> &'static HashMap<&'static [u8], Tag> {
         ("while", Tag::KeywordWhile),
     ];
 
-    // TODO: use LazyLock after it is stabilized
+    // TODO(zig-rs): use LazyLock after it is stabilized
     static KEYWORDS: OnceLock<HashMap<&'static [u8], Tag>> = OnceLock::new();
     KEYWORDS.get_or_init(|| {
         let mut map = HashMap::new();
@@ -1287,9 +1287,10 @@ impl Tokenizer<'_> {
                 0
             }
         } else {
+            // TODO(zig-rs): find a more efficient way to check if the following codepoint is valid
+
             // check utf8-encoded character.
-            let upper_bound = std::cmp::min(self.index + 4, self.buffer.len());
-            match std::str::from_utf8(&self.buffer[self.index..upper_bound]) {
+            match std::str::from_utf8(&self.buffer[self.index..]) {
                 Ok(s) => match s.chars().next() {
                     Some(c) => match c {
                         | '\u{0085}' // U+0085 (NEL)

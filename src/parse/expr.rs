@@ -96,7 +96,7 @@ impl Parser<'_, '_> {
         ];
 
         pub(super) fn oper_table() -> &'static HashMap<token::Tag, OperInfo> {
-            // TODO: use LazyLock after it is stabilized
+            // TODO(zig-rs): use LazyLock after it is stabilized
             static OPER_TABLE: OnceLock<HashMap<token::Tag, OperInfo>> = OnceLock::new();
             OPER_TABLE.get_or_init(|| {
                 let mut map = HashMap::with_capacity(ENTRIES.len());

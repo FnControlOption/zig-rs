@@ -236,7 +236,7 @@ impl Parser<'_, '_> {
                     token: tok,
                     ..Default::default()
                 });
-                // TODO: is there a better way to assign to `first_line` without needing `tmp`?
+                // TODO(zig-rs): is there a better way to assign to `first_line` without needing `tmp`?
                 let Some(tmp) = self.eat_token(token!(DocComment)) else {
                     return None;
                 };

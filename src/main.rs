@@ -4,18 +4,27 @@ use zig::*;
 
 fn main() {
     let home = std::env::var("HOME").unwrap();
-    if false {
+    if true {
         let root = format!("{home}/Documents/zig");
         let dir = format!("{root}/lib/std");
         recurse(root, dir).unwrap();
         return;
     }
-    let filename = "lib/std/crypto/pcurves/secp256k1/secp256k1_scalar_64.zig";
     let filename = "lib/std/unicode/throughput_test.zig";
     let path = format!("{home}/Documents/zig/{filename}");
     let source = std::fs::read_to_string(&path).unwrap();
-    // let filename = "-e";
-    // let source = r#"const _ = if (align_expr == 0 and section_expr == 0 and callconv_expr == 0 and addrspace_expr == 0) {};"#;
+    let filename = "-e";
+    let source = r#"const _ = "こんにちは";"#;
+    if false {
+        let mut tokenizer = Tokenizer::new(source.as_bytes());
+        loop {
+            let token = tokenizer.next();
+            println!("{:?}", token.tag);
+            if token.tag == token::Tag::Eof {
+                break;
+            }
+        }
+    }
     let tree = run(filename, &source);
     // if tree.errors.is_empty() {
     //     print!("{tree:?}");
@@ -47,9 +56,7 @@ fn recurse(
         let path = path.as_path();
 
         const SKIP: &[&str] = &[
-            "lib/std/crypto/kyber_d00.zig",
-            "lib/std/math/big/int.zig",
-            "lib/std/Uri.zig",
+            // empty
         ];
         let relpath = path.strip_prefix(prefix).unwrap();
         let relname = relpath.to_str().unwrap();
