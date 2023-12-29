@@ -7,6 +7,8 @@ fn main() {
     if true {
         let root = format!("{home}/Documents/zig");
         let dir = format!("{root}/lib/std");
+        let dir = format!("{root}/src");
+        let dir = format!("{root}");
         recurse(root, dir).unwrap();
         return;
     }
@@ -56,7 +58,9 @@ fn recurse(
         let path = path.as_path();
 
         const SKIP: &[&str] = &[
-            // empty
+            "zig-cache",
+            // "test/cases/compile_errors",
+            "test/cases/double_ampersand.0.zig",
         ];
         let relpath = path.strip_prefix(prefix).unwrap();
         let relname = relpath.to_str().unwrap();
@@ -75,4 +79,9 @@ fn recurse(
     }
 
     Ok(())
+}
+
+#[test]
+fn test() {
+    main();
 }

@@ -354,9 +354,9 @@ impl Tag {
 }
 
 pub struct Tokenizer<'src> {
-    buffer: &'src [u8],
-    index: usize,
-    pending_invalid_token: Option<Token>,
+    pub buffer: &'src [u8],
+    pub index: usize,
+    pub pending_invalid_token: Option<Token>,
 }
 
 impl Tokenizer<'_> {
@@ -376,6 +376,14 @@ impl Tokenizer<'_> {
             buffer,
             index: src_start,
             pending_invalid_token: None,
+        }
+    }
+
+    pub fn find_tag_at_current_index(&mut self, tag: Tag) -> Token {
+        if tag == Tag::Invalid {
+            todo!("find_tag_at_current_index")
+        } else {
+            self.next()
         }
     }
 

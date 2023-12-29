@@ -152,14 +152,21 @@ impl Ast<'_> {
         loc
     }
 
-    pub fn token_slice(&self, token_index: TokenIndex) -> &str {
+    pub fn token_slice(&self, token_index: TokenIndex) -> &[u8] {
         let token_tag = self.token_tag(token_index);
 
         if let Some(lexeme) = token_tag.lexeme() {
-            return lexeme;
+            return lexeme.as_bytes();
         }
 
-        todo!("token_slice")
+        let mut tokenizer = Tokenizer {
+            buffer: self.source,
+            index: self.token_start(token_index) as usize,
+            pending_invalid_token: None,
+        };
+        let token = tokenizer.find_tag_at_current_index(token_tag);
+        assert!(token.tag == self.token_tag(token_index));
+        &self.source[token.loc.start..token.loc.end]
     }
 
     pub fn dump_error(&self, parse_error: &Error, filename: &str) {
@@ -492,13 +499,13 @@ impl Ast<'_> {
                 print!(
                     "'{} {}' is invalid",
                     expected_tag.symbol(),
-                    self.token_slice(parse_error.token),
+                    String::from_utf8_lossy(self.token_slice(parse_error.token)),
                 )
             }
             error::Tag::ZigStyleContainer(expected_tag) => {
                 print!(
                     "to declare a container do 'const {} = {}'",
-                    self.token_slice(parse_error.token),
+                    String::from_utf8_lossy(self.token_slice(parse_error.token)),
                     expected_tag.symbol(),
                 )
             }

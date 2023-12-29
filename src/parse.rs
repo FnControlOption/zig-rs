@@ -157,7 +157,7 @@ impl Parser<'_, '_> {
             }
             _ => {}
         }
-        panic!("{:?}", msg.tag);
+        // panic!("{:?}", msg.tag);
         self.errors.push(msg);
     }
 
