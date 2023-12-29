@@ -157,6 +157,7 @@ impl Parser<'_, '_> {
             }
             _ => {}
         }
+        panic!("{:?}", msg.tag);
         self.errors.push(msg);
     }
 
@@ -248,7 +249,7 @@ impl Parser<'_, '_> {
     }
 
     fn tokens_on_same_line(&self, token1: TokenIndex, token2: TokenIndex) -> bool {
-        let s = &self.source[self.token_start(token1) as usize..self.token_start(token2) as usize];
+        let s = self.source(self.token_start(token1)..self.token_start(token2));
         s.iter().position(|&c| c == b'\n').is_none()
     }
 

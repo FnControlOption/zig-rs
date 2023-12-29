@@ -46,14 +46,14 @@ macro_rules! assert_error {
     ($tree:ident, $index:expr, $tag:ident) => {
         assert_error!($tree, $index, $tag, is_note: false)
     };
-    ($tree:ident, $index:expr, $tag:ident($p:pat), is_note: $is_note:expr) => {{
+    ($tree:ident, $index:expr, $tag:ident(_), is_note: $is_note:expr) => {{
         let error = &$tree.errors[$index];
-        assert!(matches!(error.tag, error!($tag($p))));
+        assert!(matches!(error.tag, error!($tag(_))));
         assert_eq!(error.is_note, $is_note);
         error
     }};
-    ($tree:ident, $index:expr, $tag:ident($p:pat)) => {
-        assert_error!($tree, $index, $tag($p), is_note: false)
+    ($tree:ident, $index:expr, $tag:ident(_)) => {
+        assert_error!($tree, $index, $tag(_), is_note: false)
     };
 }
 

@@ -35,11 +35,25 @@ impl Parser<'_, '_> {
             }
         }
         if self.eat_token(token!(Colon)).is_some() {
-            while self.eat_token(token!(StringLiteral)).is_some() {
+            loop {
+                let input_item = self.parse_asm_input_item()?;
+                if input_item == 0 {
+                    break;
+                }
+                scratch.push(input_item);
                 match self.token_tag(self.tok_i) {
                     token!(Comma) => self.tok_i += 1,
                     token!(Colon) | token!(RParen) | token!(RBrace) | token!(RBracket) => break,
                     _ => self.warn_expected(token!(Comma)),
+                }
+            }
+            if self.eat_token(token!(Colon)).is_some() {
+                while self.eat_token(token!(StringLiteral)).is_some() {
+                    match self.token_tag(self.tok_i) {
+                        token!(Comma) => self.tok_i += 1,
+                        token!(Colon) | token!(RParen) | token!(RBrace) | token!(RBracket) => break,
+                        _ => self.warn_expected(token!(Comma)),
+                    }
                 }
             }
         }

@@ -39,7 +39,7 @@ impl Parser<'_, '_> {
 
             // op! { prec: -1, tag: Root } => OperInfo
             (prec: $prec:literal, tag: $tag:ident) => {
-                op! { prec: $prec, tag: $tag, assoc: None }
+                op! { prec: $prec, tag: $tag, assoc: Left }
             };
 
             // op! { AngleBracketLeft, prec: 30, tag: LessThan, assoc: None } => (token::Tag, OperInfo)
@@ -50,7 +50,7 @@ impl Parser<'_, '_> {
 
             // op! { Plus, prec: 60, tag: Add } => (token::Tag, OperInfo)
             ($key:ident, prec: $prec:literal, tag: $tag:ident) => {
-                op! { $key, prec: $prec, tag: $tag, assoc: None }
+                op! { $key, prec: $prec, tag: $tag, assoc: Left }
             };
         }
 
@@ -136,9 +136,10 @@ impl Parser<'_, '_> {
             }
 
             {
+                let tok_start = self.token_start(oper_token) as usize;
                 let tok_len = tok_tag.lexeme().unwrap().len();
-                let byte_before = self.source[self.token_start(oper_token) as usize - 1];
-                let byte_after = self.source[self.token_start(oper_token) as usize + tok_len];
+                let byte_before = self.source[tok_start - 1];
+                let byte_after = self.source[tok_start + tok_len];
                 if tok_tag == token!(Ampersand) && byte_after == b'&' {
                     self.warn_msg(Error {
                         tag: error!(InvalidAmpersandAmpersand),

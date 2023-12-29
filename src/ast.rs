@@ -162,6 +162,15 @@ impl Ast<'_> {
         todo!("token_slice")
     }
 
+    pub fn dump_error(&self, parse_error: &Error, filename: &str) {
+        let loc = self.token_location(0, parse_error.token);
+        let line = loc.line + 1;
+        let column = loc.column + 1 + self.error_offset(parse_error) as usize;
+        print!("{filename}:{line}:{column}: ");
+        self.render_error(parse_error);
+        println!();
+    }
+
     pub fn render_error(&self, parse_error: &Error) {
         match parse_error.tag {
             error::Tag::AsteriskAfterPtrDeref => {

@@ -584,14 +584,14 @@ impl Parser<'_, '_> {
 
                             let lhs = enum_tag_expr;
                             let rhs = self.add_extra(members_span);
-                            self.add_node(Node {
+                            return Ok(self.add_node(Node {
                                 tag: match members.trailing {
                                     true => node!(TaggedUnionEnumTagTrailing),
                                     false => node!(TaggedUnionEnumTag),
                                 },
                                 main_token,
                                 data: node::Data { lhs, rhs },
-                            })
+                            }));
                         }
                         None => {
                             self.expect_token(token!(RParen))?;
@@ -600,7 +600,7 @@ impl Parser<'_, '_> {
                             let members = self.parse_container_members();
                             self.expect_token(token!(RBrace))?;
                             if members.len <= 2 {
-                                self.add_node(Node {
+                                return Ok(self.add_node(Node {
                                     tag: match members.trailing {
                                         true => node!(TaggedUnionTwoTrailing),
                                         false => node!(TaggedUnionTwo),
@@ -610,10 +610,10 @@ impl Parser<'_, '_> {
                                         lhs: members.lhs,
                                         rhs: members.rhs,
                                     },
-                                })
+                                }));
                             } else {
                                 let span = members.to_span(self);
-                                self.add_node(Node {
+                                return Ok(self.add_node(Node {
                                     tag: match members.trailing {
                                         true => node!(TaggedUnionTrailing),
                                         false => node!(TaggedUnion),
@@ -623,7 +623,7 @@ impl Parser<'_, '_> {
                                         lhs: span.start,
                                         rhs: span.end,
                                     },
-                                })
+                                }));
                             }
                         }
                     },
