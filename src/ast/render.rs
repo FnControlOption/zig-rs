@@ -1,5 +1,4 @@
 use super::*;
-use crate::macros::token;
 use std::fmt::{Error, Write};
 
 type Result<T> = std::result::Result<T, Error>;

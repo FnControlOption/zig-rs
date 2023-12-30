@@ -1,7 +1,4 @@
 use super::*;
-use crate::ast::node::ExtraData;
-use crate::ast::GetExtraData;
-use crate::macros::{error, node, token};
 
 // After changing DUMP_TREE to true, run `cargo test` with `--show-output`:
 //
@@ -638,7 +635,7 @@ fn test_assign_destructure() {
     let node = assert_node!(tree, node.data.rhs, BlockTwoSemicolon);
     let node = assert_node!(tree, node.data.lhs, AssignDestructure);
     assert_token!(tree, node.main_token, Equal);
-    let lhs_count: node::Index = tree.extra_data(node.data.lhs);
+    let lhs_count: u32 = tree.extra_data(node.data.lhs);
     assert_eq!(lhs_count, 2);
     assert_node!(tree, node.data.rhs, Identifier, "foo");
 }

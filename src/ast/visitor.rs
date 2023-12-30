@@ -62,7 +62,7 @@ impl Node {
                         DataType::Node => visitor.accept_child(tree, data),
                         DataType::Token => visitor.accept_token(tree, data),
                         DataType::NodeSlice => {
-                            let count: node::Index = tree.extra_data(data);
+                            let count: u32 = tree.extra_data(data);
                             let start = data + 1;
                             let end = start + count;
                             visitor.accept_extra_children(tree, start..end);
@@ -206,8 +206,6 @@ extra_data_all_nodes!(WhileCont);
 extra_data_all_nodes!(FnProtoOne);
 
 fn get_data_types(mode: Mode, tag: node::Tag) -> PairType {
-    use crate::macros::node;
-
     macro_rules! data {
         ($type:ident) => {
             PairType::$type

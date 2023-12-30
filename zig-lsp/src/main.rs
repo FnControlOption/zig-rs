@@ -167,7 +167,7 @@ fn get_diagnostics(uri: &Url, tree: &zig::Ast<'_>) -> Vec<Diagnostic> {
         let character = loc.column as u32 + tree.error_offset(error);
         let start = Position { line, character };
         let range = Range { start, end: start };
-        let message = error.render(tree).into_owned();
+        let message = error.message(tree).into_owned();
 
         if error.is_note {
             let uri = uri.clone();

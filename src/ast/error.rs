@@ -112,8 +112,8 @@ impl std::fmt::Display for Display<'_, '_, '_, '_> {
         let loc = self.tree.token_location(0, self.error.token);
         let line = loc.line + 1;
         let column = loc.column + 1 + self.tree.error_offset(self.error) as usize;
-        let s = self.error.render(self.tree);
-        write!(f, "{filename}:{line}:{column}: {s}")
+        let message = self.error.message(self.tree);
+        write!(f, "{filename}:{line}:{column}: {message}")
     }
 }
 
@@ -130,7 +130,7 @@ impl Error {
         }
     }
 
-    pub fn render(&self, tree: &Ast) -> Cow<'static, str> {
+    pub fn message(&self, tree: &Ast) -> Cow<'static, str> {
         match self.tag {
             Tag::AsteriskAfterPtrDeref => {
                 Cow::from("'.*' cannot be followed by '*'. Are you missing a space?")
@@ -351,8 +351,8 @@ impl Error {
             Tag::InvalidAmpersandAmpersand => {
                 // rustfmt gives up on chains if any line is too long
                 // https://github.com/rust-lang/rustfmt/issues/3863
-                const MSG: &str = "ambiguous use of '&&'; use 'and' for logical AND, or change whitespace to ' & &' for bitwise AND";
-                Cow::from(MSG)
+                const MESSAGE: &str = "ambiguous use of '&&'; use 'and' for logical AND, or change whitespace to ' & &' for bitwise AND";
+                Cow::from(MESSAGE)
             }
             Tag::CStyleContainer(expected_tag) => Cow::from(format!(
                 "'{} {}' is invalid",
