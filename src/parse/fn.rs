@@ -153,11 +153,7 @@ impl Parser<'_, '_> {
             }
         }
         if let Varargs::Nonfinal(token) = varargs {
-            self.warn_msg(Error {
-                tag: error!(VarargsNonfinal),
-                token,
-                ..Default::default()
-            });
+            self.warn_msg(Error::new(error!(VarargsNonfinal), token));
         }
         Ok(match params[..] {
             [] => SmallSpan::ZeroOrOne(0),

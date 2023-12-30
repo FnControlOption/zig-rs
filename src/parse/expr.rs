@@ -11,7 +11,7 @@ impl Parser<'_, '_> {
     pub(super) fn expect_expr(&mut self) -> Result<node::Index> {
         let node = self.parse_expr()?;
         if node == 0 {
-            self.fail(error::Tag::ExpectedExpr)
+            self.fail(error!(ExpectedExpr))
         } else {
             Ok(node)
         }
@@ -122,7 +122,7 @@ impl Parser<'_, '_> {
                 break;
             }
             if info.prec == banned_prec {
-                return self.fail(error::Tag::ChainedComparisonOperators);
+                return self.fail(error!(ChainedComparisonOperators));
             }
 
             let oper_token = self.next_token();
@@ -131,7 +131,7 @@ impl Parser<'_, '_> {
             }
             let rhs = self.parse_expr_precedence(info.prec + 1)?;
             if rhs == 0 {
-                self.warn(error::Tag::ExpectedExpr);
+                self.warn(error!(ExpectedExpr));
                 return Ok(node);
             }
 
@@ -141,17 +141,9 @@ impl Parser<'_, '_> {
                 let byte_before = self.source[tok_start - 1];
                 let byte_after = self.source[tok_start + tok_len];
                 if tok_tag == token!(Ampersand) && byte_after == b'&' {
-                    self.warn_msg(Error {
-                        tag: error!(InvalidAmpersandAmpersand),
-                        token: oper_token,
-                        ..Default::default()
-                    });
+                    self.warn_msg(Error::new(error!(InvalidAmpersandAmpersand), oper_token));
                 } else if byte_before.is_ascii_whitespace() != byte_after.is_ascii_whitespace() {
-                    self.warn_msg(Error {
-                        tag: error!(MismatchedBinaryOpWhitespace),
-                        token: oper_token,
-                        ..Default::default()
-                    });
+                    self.warn_msg(Error::new(error!(MismatchedBinaryOpWhitespace), oper_token));
                 }
             }
 

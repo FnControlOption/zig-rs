@@ -124,11 +124,7 @@ impl Parser<'_, '_> {
             None => 'eql: {
                 let [lhs] = scratch[..] else {
                     if let Some(tok) = self.eat_token(token!(EqualEqual)) {
-                        self.warn_msg(Error {
-                            tag: error!(WrongEqualVarDecl),
-                            token: tok,
-                            ..Default::default()
-                        });
+                        self.warn_msg(Error::new(error!(WrongEqualVarDecl), tok));
                         break 'eql tok;
                     }
                     return self.fail_expected(token!(Equal));
@@ -139,11 +135,7 @@ impl Parser<'_, '_> {
                     | node!(SimpleVarDecl)
                     | node!(AlignedVarDecl) => {
                         if let Some(tok) = self.eat_token(token!(EqualEqual)) {
-                            self.warn_msg(Error {
-                                tag: error!(WrongEqualVarDecl),
-                                token: tok,
-                                ..Default::default()
-                            });
+                            self.warn_msg(Error::new(error!(WrongEqualVarDecl), tok));
                             break 'eql tok;
                         }
                         return self.fail_expected(token!(Equal));

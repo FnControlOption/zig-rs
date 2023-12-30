@@ -110,11 +110,7 @@ impl Parser<'_, '_> {
             let identifier = self.expect_token(token!(Identifier))?;
             captures += 1;
             if captures > inputs && !warned_excess {
-                self.warn_msg(Error {
-                    tag: error!(ExtraForCapture),
-                    token: identifier,
-                    ..Default::default()
-                });
+                self.warn_msg(Error::new(error!(ExtraForCapture), identifier));
                 warned_excess = true;
             }
             match self.token_tag(self.tok_i) {
@@ -133,11 +129,7 @@ impl Parser<'_, '_> {
         if captures < inputs {
             let index = scratch.len() - captures;
             let input = self.node(scratch[index]).main_token;
-            self.warn_msg(Error {
-                tag: error!(ForInputNotCaptured),
-                token: input,
-                ..Default::default()
-            });
+            self.warn_msg(Error::new(error!(ForInputNotCaptured), input));
         }
         Ok(inputs)
     }

@@ -204,11 +204,10 @@ impl Parser<'_, '_> {
                         let mods = self.parse_ptr_modifiers()?;
                         let elem_type = self.expect_type_expr()?;
                         if mods.bit_range_start != 0 {
-                            self.warn_msg(Error {
-                                tag: error!(InvalidBitRange),
-                                token: self.node(mods.bit_range_start).main_token,
-                                ..Default::default()
-                            });
+                            self.warn_msg(Error::new(
+                                error!(InvalidBitRange),
+                                self.node(mods.bit_range_start).main_token,
+                            ));
                         }
                         if sentinel == 0 && mods.addrspace_node == 0 {
                             Ok(self.add_node(Node {

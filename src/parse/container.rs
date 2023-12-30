@@ -45,11 +45,7 @@ impl Parser<'_, '_> {
             match self.token_tag(self.tok_i) {
                 token!(KeywordTest) => {
                     if let Some(some) = doc_comment {
-                        self.warn_msg(Error {
-                            tag: error!(TestDocComment),
-                            token: some,
-                            ..Default::default()
-                        });
+                        self.warn_msg(Error::new(error!(TestDocComment), some));
                     }
                     let test_decl_node = self.expect_test_decl_recoverable();
                     if test_decl_node != 0 {
@@ -63,11 +59,7 @@ impl Parser<'_, '_> {
                 token!(KeywordComptime) => match self.token_tag(self.tok_i + 1) {
                     token!(LBrace) => {
                         if let Some(some) = doc_comment {
-                            self.warn_msg(Error {
-                                tag: error!(ComptimeDocComment),
-                                token: some,
-                                ..Default::default()
-                            });
+                            self.warn_msg(Error::new(error!(ComptimeDocComment), some));
                         }
                         let comptime_token = self.next_token();
                         let block = self.parse_block().unwrap_or_else(|err| {
@@ -101,23 +93,12 @@ impl Parser<'_, '_> {
                             FieldState::None => field_state = FieldState::Seen,
                             FieldState::Err | FieldState::Seen => {}
                             FieldState::End(node) => {
-                                self.warn_msg(Error {
-                                    tag: error!(DeclBetweenFields),
-                                    token: self.node(node).main_token,
-                                    ..Default::default()
-                                });
-                                self.warn_msg(Error {
-                                    tag: error!(PreviousField),
-                                    is_note: true,
-                                    token: last_field,
-                                    ..Default::default()
-                                });
-                                self.warn_msg(Error {
-                                    tag: error!(NextField),
-                                    is_note: true,
-                                    token: identifier,
-                                    ..Default::default()
-                                });
+                                self.warn_msg(Error::new(
+                                    error!(DeclBetweenFields),
+                                    self.node(node).main_token,
+                                ));
+                                self.warn_msg(Error::note(error!(PreviousField), last_field));
+                                self.warn_msg(Error::note(error!(NextField), identifier));
                                 field_state = FieldState::Err;
                             }
                         }
@@ -178,11 +159,7 @@ impl Parser<'_, '_> {
                 }
                 token!(Eof) | token!(RBrace) => {
                     if let Some(token) = doc_comment {
-                        self.warn_msg(Error {
-                            tag: error!(UnattachedDocComment),
-                            token,
-                            ..Default::default()
-                        });
+                        self.warn_msg(Error::new(error!(UnattachedDocComment), token));
                     }
                     break;
                 }
@@ -203,23 +180,12 @@ impl Parser<'_, '_> {
                         FieldState::None => field_state = FieldState::Seen,
                         FieldState::Err | FieldState::Seen => {}
                         FieldState::End(node) => {
-                            self.warn_msg(Error {
-                                tag: error!(DeclBetweenFields),
-                                token: self.node(node).main_token,
-                                ..Default::default()
-                            });
-                            self.warn_msg(Error {
-                                tag: error!(PreviousField),
-                                is_note: true,
-                                token: previous_field,
-                                ..Default::default()
-                            });
-                            self.warn_msg(Error {
-                                tag: error!(NextField),
-                                is_note: true,
-                                token: identifier,
-                                ..Default::default()
-                            });
+                            self.warn_msg(Error::new(
+                                error!(DeclBetweenFields),
+                                self.node(node).main_token,
+                            ));
+                            self.warn_msg(Error::note(error!(PreviousField), previous_field));
+                            self.warn_msg(Error::note(error!(NextField), identifier));
                             field_state = FieldState::Err;
                         }
                     }
@@ -240,12 +206,7 @@ impl Parser<'_, '_> {
                     if self.token_tag(self.tok_i) == token!(Semicolon)
                         && self.token_tag(identifier) == token!(Identifier)
                     {
-                        self.warn_msg(Error {
-                            tag: error!(VarConstDecl),
-                            is_note: true,
-                            token: identifier,
-                            ..Default::default()
-                        });
+                        self.warn_msg(Error::note(error!(VarConstDecl), identifier));
                     }
                     self.find_next_container_member();
                     continue;
@@ -392,11 +353,7 @@ impl Parser<'_, '_> {
                 }
                 token!(LBrace) => {
                     if is_extern {
-                        self.warn_msg(Error {
-                            tag: error!(ExternFnBody),
-                            token: extern_export_inline_token,
-                            ..Default::default()
-                        });
+                        self.warn_msg(Error::new(error!(ExternFnBody), extern_export_inline_token));
                         return Ok(NULL_NODE);
                     }
                     let fn_decl = self.add_node(Node {
@@ -537,18 +494,15 @@ impl Parser<'_, '_> {
         }
         self.tok_i += 2;
 
-        self.warn_msg(Error {
-            tag: error!(CStyleContainer(self.token_tag(main_token))),
-            token: identifier,
-            ..Default::default()
-        });
+        self.warn_msg(Error::new(
+            error!(CStyleContainer(self.token_tag(main_token))),
+            identifier,
+        ));
 
-        self.warn_msg(Error {
-            tag: error!(ZigStyleContainer(self.token_tag(main_token))),
-            is_note: true,
-            token: identifier,
-            ..Default::default()
-        });
+        self.warn_msg(Error::note(
+            error!(ZigStyleContainer(self.token_tag(main_token))),
+            identifier,
+        ));
 
         self.expect_token(token!(LBrace))?;
         self.parse_container_members();

@@ -99,57 +99,52 @@ impl Parser<'_, '_> {
 
     #[cold]
     fn warn_expected(&mut self, expected_token: token::Tag) {
-        self.warn_msg(Error {
-            tag: error::Tag::ExpectedToken(expected_token),
-            token: self.tok_i,
-            ..Default::default()
-        });
+        self.warn_msg(Error::new(
+            error!(ExpectedToken(expected_token)),
+            self.tok_i,
+        ));
     }
 
     #[cold]
     fn warn(&mut self, error_tag: error::Tag) {
-        self.warn_msg(Error {
-            tag: error_tag,
-            token: self.tok_i,
-            ..Default::default()
-        });
+        self.warn_msg(Error::new(error_tag, self.tok_i));
     }
 
     #[cold]
     fn warn_msg(&mut self, mut msg: Error) {
         match msg.tag {
-            error::Tag::ExpectedSemiAfterDecl
-            | error::Tag::ExpectedSemiAfterStmt
-            | error::Tag::ExpectedCommaAfterField
-            | error::Tag::ExpectedCommaAfterArg
-            | error::Tag::ExpectedCommaAfterParam
-            | error::Tag::ExpectedCommaAfterInitializer
-            | error::Tag::ExpectedCommaAfterSwitchProng
-            | error::Tag::ExpectedCommaAfterForOperand
-            | error::Tag::ExpectedCommaAfterCapture
-            | error::Tag::ExpectedSemiOrElse
-            | error::Tag::ExpectedSemiOrLBrace
-            | error::Tag::ExpectedToken(_)
-            | error::Tag::ExpectedBlock
-            | error::Tag::ExpectedBlockOrAssignment
-            | error::Tag::ExpectedBlockOrExpr
-            | error::Tag::ExpectedBlockOrField
-            | error::Tag::ExpectedExpr
-            | error::Tag::ExpectedExprOrAssignment
-            | error::Tag::ExpectedFn
-            | error::Tag::ExpectedInlinable
-            | error::Tag::ExpectedLabelable
-            | error::Tag::ExpectedParamList
-            | error::Tag::ExpectedPrefixExpr
-            | error::Tag::ExpectedPrimaryTypeExpr
-            | error::Tag::ExpectedPubItem
-            | error::Tag::ExpectedReturnType
-            | error::Tag::ExpectedSuffixOp
-            | error::Tag::ExpectedTypeExpr
-            | error::Tag::ExpectedVarDecl
-            | error::Tag::ExpectedVarDeclOrFn
-            | error::Tag::ExpectedLoopPayload
-            | error::Tag::ExpectedContainer => {
+            error!(ExpectedSemiAfterDecl)
+            | error!(ExpectedSemiAfterStmt)
+            | error!(ExpectedCommaAfterField)
+            | error!(ExpectedCommaAfterArg)
+            | error!(ExpectedCommaAfterParam)
+            | error!(ExpectedCommaAfterInitializer)
+            | error!(ExpectedCommaAfterSwitchProng)
+            | error!(ExpectedCommaAfterForOperand)
+            | error!(ExpectedCommaAfterCapture)
+            | error!(ExpectedSemiOrElse)
+            | error!(ExpectedSemiOrLBrace)
+            | error!(ExpectedToken(_))
+            | error!(ExpectedBlock)
+            | error!(ExpectedBlockOrAssignment)
+            | error!(ExpectedBlockOrExpr)
+            | error!(ExpectedBlockOrField)
+            | error!(ExpectedExpr)
+            | error!(ExpectedExprOrAssignment)
+            | error!(ExpectedFn)
+            | error!(ExpectedInlinable)
+            | error!(ExpectedLabelable)
+            | error!(ExpectedParamList)
+            | error!(ExpectedPrefixExpr)
+            | error!(ExpectedPrimaryTypeExpr)
+            | error!(ExpectedPubItem)
+            | error!(ExpectedReturnType)
+            | error!(ExpectedSuffixOp)
+            | error!(ExpectedTypeExpr)
+            | error!(ExpectedVarDecl)
+            | error!(ExpectedVarDeclOrFn)
+            | error!(ExpectedLoopPayload)
+            | error!(ExpectedContainer) => {
                 if msg.token != 0 && !self.tokens_on_same_line(msg.token - 1, msg.token) {
                     msg.token_is_prev = true;
                     msg.token -= 1;
@@ -163,20 +158,15 @@ impl Parser<'_, '_> {
 
     #[cold]
     fn fail<T>(&mut self, error_tag: error::Tag) -> Result<T> {
-        self.fail_msg(Error {
-            tag: error_tag,
-            token: self.tok_i,
-            ..Default::default()
-        })
+        self.fail_msg(Error::new(error_tag, self.tok_i))
     }
 
     #[cold]
     fn fail_expected<T>(&mut self, expected_token: token::Tag) -> Result<T> {
-        self.fail_msg(Error {
-            tag: error::Tag::ExpectedToken(expected_token),
-            token: self.tok_i,
-            ..Default::default()
-        })
+        self.fail_msg(Error::new(
+            error!(ExpectedToken(expected_token)),
+            self.tok_i,
+        ))
     }
 
     #[cold]
@@ -231,11 +221,7 @@ impl Parser<'_, '_> {
         if let Some(tok) = self.eat_token(token!(DocComment)) {
             let mut first_line = tok;
             if tok > 0 && self.tokens_on_same_line(tok - 1, tok) {
-                self.warn_msg(Error {
-                    tag: error::Tag::SameLineDocComment,
-                    token: tok,
-                    ..Default::default()
-                });
+                self.warn_msg(Error::new(error!(SameLineDocComment), tok));
                 // TODO(zig-rs): is there a better way to assign to `first_line` without needing `tmp`?
                 let Some(tmp) = self.eat_token(token!(DocComment)) else {
                     return None;
@@ -269,11 +255,7 @@ impl Parser<'_, '_> {
 
     fn expect_token(&mut self, tag: token::Tag) -> Result<TokenIndex> {
         if self.token_tag(self.tok_i) != tag {
-            return self.fail_msg(Error {
-                tag: error::Tag::ExpectedToken(tag),
-                token: self.tok_i,
-                ..Default::default()
-            });
+            return self.fail_msg(Error::new(error!(ExpectedToken(tag)), self.tok_i));
         }
         Ok(self.next_token())
     }

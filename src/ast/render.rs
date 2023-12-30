@@ -24,7 +24,7 @@ pub fn render_tree(writer: &mut dyn Write, tree: &Ast, fixups: Fixups) -> Result
 
     match tree.mode {
         Mode::Zon => todo!("render_tree"),
-        Mode::Zig => todo!("render_tree"), // r.render_members(tree.root_decls())
+        Mode::Zig => r.render_members(tree.root_decls())?,
     }
 
     if let Some(disabled_offset) = r.ais.disabled_offset {
@@ -40,7 +40,29 @@ pub struct Render<'write, 'ast, 'src> {
     fixups: Fixups,
 }
 
+enum Container {
+    Enum,
+    Tuple,
+    Other,
+}
+
 impl Render<'_, '_, '_> {
+    fn render_members(&self, members: &[u32]) -> Result<()> {
+        let tree = self.tree;
+        if members.is_empty() {
+            return Ok(());
+        }
+        let container = 'blk: {
+            for member in members {
+                if false {
+                    break 'blk Container::Other;
+                }
+            }
+            Container::Tuple
+        };
+        todo!("render_members")
+    }
+
     fn render_comments(&mut self, start: usize, end: usize) -> Result<bool> {
         let tree = self.tree;
         let ais = &mut self.ais;

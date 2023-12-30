@@ -196,18 +196,10 @@ impl Parser<'_, '_> {
                     Some(_) => self.expect_expr()?,
                 };
                 if a != 0 || b != 0 || c != 0 || d != 0 {
-                    return self.fail_msg(Error {
-                        tag: error!(ExpectedVarConst),
-                        token: label_token,
-                        ..Default::default()
-                    });
+                    return self.fail_msg(Error::new(error!(ExpectedVarConst), label_token));
                 }
             }
-            return self.fail_msg(Error {
-                tag: error!(ExpectedLabelable),
-                token: after_colon,
-                ..Default::default()
-            });
+            return self.fail_msg(Error::new(error!(ExpectedLabelable), after_colon));
         }
 
         Ok(NULL_NODE)
