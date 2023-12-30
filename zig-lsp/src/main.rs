@@ -12,6 +12,15 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
+#[tokio::main]
+async fn main() {
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
+
+    let (service, socket) = LspService::new(|client| Backend::new(client));
+    Server::new(stdin, stdout, socket).serve(service).await;
+}
+
 #[derive(Debug)]
 struct Backend {
     client: Client,
@@ -31,16 +40,18 @@ macro_rules! semantic_tokens_types {
     ($($name:ident),*) => {
         fn semantic_token_types() -> Vec<SemanticTokenType> {
             let types = vec![$(SemanticTokenType::$name),*];
-            $(assert_eq!(SemanticTokenType::$name, types[semantic_token_types::$name as usize]);)*
+            $(assert_eq!(SemanticTokenType::$name, types[semantic_tokens::$name as usize]);)*
             types
         }
     };
 }
 
-semantic_tokens_types!(STRUCT);
+semantic_tokens_types!(TYPE);
 
-mod semantic_token_types {
-    pub const STRUCT: u32 = 0;
+mod semantic_tokens {
+    use super::*;
+    const _: Option<SemanticTokenType> = None;
+    pub const TYPE: u32 = 0;
 }
 
 #[tower_lsp::async_trait]
@@ -133,7 +144,7 @@ impl Backend {
     async fn parse_text(&self, uri: Url, version: i32, text: &str) {
         let tree = zig::Ast::parse(text.as_bytes(), zig::ast::Mode::Zig);
 
-        let semantic_tokens = get_semantic_tokens(&tree);
+        let semantic_tokens = self.get_semantic_tokens(&tree);
         {
             let mut map = self.semantic_tokens_map.write().await;
             map.insert(uri.clone(), semantic_tokens);
@@ -144,18 +155,6 @@ impl Backend {
             .publish_diagnostics(uri.clone(), diags, Some(version))
             .await;
     }
-}
-
-fn get_semantic_tokens(tree: &zig::Ast<'_>) -> Vec<SemanticToken> {
-    let mut semantic_tokens = Vec::new();
-    // semantic_tokens.push(SemanticToken {
-    //     delta_line: 1,
-    //     delta_start: 6,
-    //     length: 3,
-    //     token_type: semantic_token_types::STRUCT,
-    //     token_modifiers_bitset: 0,
-    // });
-    semantic_tokens
 }
 
 fn get_diagnostics(uri: &Url, tree: &zig::Ast<'_>) -> Vec<Diagnostic> {
@@ -190,11 +189,101 @@ fn get_diagnostics(uri: &Url, tree: &zig::Ast<'_>) -> Vec<Diagnostic> {
     diags
 }
 
-#[tokio::main]
-async fn main() {
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
+impl Backend {
+    fn get_semantic_tokens(&self, tree: &zig::Ast<'_>) -> Vec<SemanticToken> {
+        use zig::ast::*;
+        use zig::*;
 
-    let (service, socket) = LspService::new(|client| Backend::new(client));
-    Server::new(stdin, stdout, socket).serve(service).await;
+        struct SemanticVisitor<'a> {
+            backend: &'a Backend,
+            tokens: Vec<SemanticToken>,
+            previous: Option<(TokenIndex, ast::Location)>,
+        }
+
+        impl SemanticVisitor<'_> {
+            fn new(backend: &Backend) -> SemanticVisitor {
+                SemanticVisitor {
+                    backend,
+                    tokens: Vec::new(),
+                    previous: None,
+                }
+            }
+
+            fn push_token(&mut self, tree: &Ast, token_index: TokenIndex, token_type: u32) {
+                let start_offset = match &self.previous {
+                    Some((previous_index, previous_loc)) => {
+                        assert!(*previous_index < token_index);
+                        previous_loc.line_start
+                    }
+                    None => 0,
+                };
+
+                let token_loc = tree.token_location(start_offset as u32, token_index);
+                let token_slice = tree.token_slice(token_index);
+                let token_len = token_slice.len();
+
+                let mut delta_line = token_loc.line;
+                let mut delta_column = token_loc.column;
+
+                if delta_line == 0 {
+                    if let Some((_, previous_loc)) = &self.previous {
+                        delta_column -= previous_loc.column;
+                    }
+                }
+
+                self.previous = Some((token_index, token_loc));
+
+                self.tokens.push(SemanticToken {
+                    delta_line: delta_line as u32,
+                    delta_start: delta_column as u32,
+                    length: token_len as u32,
+                    token_type,
+                    token_modifiers_bitset: 0,
+                });
+            }
+        }
+
+        impl Visitor for SemanticVisitor<'_> {
+            fn visit(&mut self, tree: &Ast, node: &Node) -> bool {
+                match node.tag {
+                    node::Tag::GlobalVarDecl
+                    | node::Tag::LocalVarDecl
+                    | node::Tag::SimpleVarDecl
+                    | node::Tag::AlignedVarDecl => 'blk: {
+                        if node.data.rhs == 0 {
+                            break 'blk;
+                        }
+
+                        let name_token = node.main_token + 1;
+                        let init_node = tree.node(node.data.rhs);
+                        let init_token = tree.token_tag(init_node.main_token);
+
+                        match init_node.tag {
+                            node::Tag::ContainerDecl
+                            | node::Tag::ContainerDeclTrailing
+                            | node::Tag::ContainerDeclTwo
+                            | node::Tag::ContainerDeclTwoTrailing
+                            | node::Tag::ContainerDeclArg
+                            | node::Tag::ContainerDeclArgTrailing => match init_token {
+                                token::Tag::KeywordStruct
+                                | token::Tag::KeywordUnion
+                                | token::Tag::KeywordOpaque
+                                | token::Tag::KeywordEnum => {
+                                    self.push_token(tree, name_token, semantic_tokens::TYPE);
+                                }
+                                _ => {}
+                            },
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
+                true
+            }
+        }
+
+        let mut visitor = SemanticVisitor::new(self);
+        tree.accept(&mut visitor);
+        visitor.tokens
+    }
 }

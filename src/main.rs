@@ -9,7 +9,7 @@ use zig::*;
 
 fn main() {
     let home = std::env::var("HOME").unwrap();
-    if false {
+    if true {
         let root = format!("{home}/Documents/zig");
         let dir = format!("{root}/lib/std");
         let dir = format!("{root}/src");
@@ -43,6 +43,7 @@ fn run<'src>(filename: &str, source: &'src str) -> Ast<'src> {
     for error in tree.errors.iter() {
         tree.dump_error(error, filename);
     }
+    format!("{}", tree.display());
     tree
 }
 
