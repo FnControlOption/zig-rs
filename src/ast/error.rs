@@ -90,3 +90,34 @@ pub enum Tag {
 
     ExpectedToken(token::Tag),
 }
+
+pub struct Display<'err, 'file, 'ast, 'src> {
+    error: &'err Error,
+    filename: &'file str,
+    tree: &'ast Ast<'src>,
+}
+
+impl std::fmt::Display for Display<'_, '_, '_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let filename = self.filename;
+        let loc = self.tree.token_location(0, self.error.token);
+        let line = loc.line + 1;
+        let column = loc.column + 1 + self.tree.error_offset(self.error) as usize;
+        write!(f, "{filename}:{line}:{column}: ")?;
+        self.tree.render_error(self.error, f)
+    }
+}
+
+impl Error {
+    pub fn display<'err, 'file, 'ast, 'src>(
+        &'err self,
+        filename: &'file str,
+        tree: &'ast Ast<'src>,
+    ) -> Display<'err, 'file, 'ast, 'src> {
+        Display {
+            error: self,
+            filename,
+            tree,
+        }
+    }
+}

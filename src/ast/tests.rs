@@ -28,7 +28,7 @@ macro_rules! assert_token {
     ($tree:ident, $index:expr, $tag:ident, $needle:expr) => {{
         assert_eq!($tree.token_tag($index), token!($tag));
         let start = $tree.token_start($index);
-        assert!($tree.source_slice(start).starts_with($needle.as_bytes()));
+        assert!($tree.source(start).starts_with($needle.as_bytes()));
     }};
     ($tree:ident, $index:expr, $tag:ident) => {{
         assert!(token!($tag).lexeme().is_some());

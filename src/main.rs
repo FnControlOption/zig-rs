@@ -41,7 +41,7 @@ fn main() {
 fn run<'src>(filename: &str, source: &'src str) -> Ast<'src> {
     let tree = Ast::parse(source.as_bytes(), ast::Mode::Zig);
     for error in tree.errors.iter() {
-        tree.dump_error(error, filename);
+        println!("{}", error.display(filename, &tree));
     }
     format!("{}", tree.display());
     tree

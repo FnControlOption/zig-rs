@@ -8,6 +8,8 @@ pub use visitor::Visitor;
 pub mod display;
 pub use display::Display;
 
+mod render;
+
 #[cfg(test)]
 mod tests;
 
@@ -22,8 +24,22 @@ pub struct Ast<'src> {
 }
 
 impl Ast<'_> {
-    pub fn source_slice(&self, start: ByteOffset) -> &[u8] {
+    pub fn source(&self, start: ByteOffset) -> &[u8] {
         &self.source[start as usize..]
+    }
+
+    pub fn render(&self) -> Result<String, std::fmt::Error> {
+        let mut buffer = String::new();
+        self.render_to_writer(&mut buffer, Default::default())?;
+        Ok(buffer)
+    }
+
+    pub fn render_to_writer(
+        &self,
+        writer: &mut dyn std::fmt::Write,
+        fixups: render::Fixups,
+    ) -> std::fmt::Result {
+        render::render_tree(writer, self, fixups)
     }
 
     pub fn token_tag(&self, index: TokenIndex) -> token::Tag {
@@ -175,27 +191,31 @@ impl Ast<'_> {
         &self.source[token.loc.start..token.loc.end]
     }
 
-    pub fn dump_error(&self, parse_error: &Error, filename: &str) {
-        let loc = self.token_location(0, parse_error.token);
-        let line = loc.line + 1;
-        let column = loc.column + 1 + self.error_offset(parse_error) as usize;
-        let s = self.render_error(parse_error);
-        println!("{filename}:{line}:{column}: {s}");
+    fn root_decls(&self) -> &[node::Index] {
+        &self.extra_data[self.node(0).data.lhs as usize..self.node(0).data.rhs as usize]
     }
 
-    pub fn render_error(&self, parse_error: &Error) -> String {
+    pub fn render_error(
+        &self,
+        parse_error: &Error,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
         match parse_error.tag {
             error::Tag::AsteriskAfterPtrDeref => {
-                format!("'.*' cannot be followed by '*'. Are you missing a space?")
+                write!(
+                    f,
+                    "'.*' cannot be followed by '*'. Are you missing a space?"
+                )
             }
             error::Tag::ChainedComparisonOperators => {
-                format!("comparison operators cannot be chained")
+                write!(f, "comparison operators cannot be chained")
             }
             error::Tag::DeclBetweenFields => {
-                format!("declarations are not allowed between container fields")
+                write!(f, "declarations are not allowed between container fields")
             }
             error::Tag::ExpectedBlock => {
-                format!(
+                write!(
+                    f,
                     "expected block, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -205,7 +225,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedBlockOrAssignment => {
-                format!(
+                write!(
+                    f,
                     "expected block or assignment, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -215,7 +236,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedBlockOrExpr => {
-                format!(
+                write!(
+                    f,
                     "expected block or expression, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -225,7 +247,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedBlockOrField => {
-                format!(
+                write!(
+                    f,
                     "expected block or field, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -235,13 +258,15 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedContainerMembers => {
-                format!(
+                write!(
+                    f,
                     "expected test, comptime, var decl, or container field, found '{}'",
                     self.token_tag(parse_error.token).symbol(),
                 )
             }
             error::Tag::ExpectedExpr => {
-                format!(
+                write!(
+                    f,
                     "expected expression, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -251,7 +276,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedExprOrAssignment => {
-                format!(
+                write!(
+                    f,
                     "expected expression or assignment, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -261,7 +287,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedExprOrVarDecl => {
-                format!(
+                write!(
+                    f,
                     "expected expression or var decl, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -271,7 +298,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedFn => {
-                format!(
+                write!(
+                    f,
                     "expected function, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -281,7 +309,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedInlinable => {
-                format!(
+                write!(
+                    f,
                     "expected 'while' or 'for', found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -291,7 +320,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedLabelable => {
-                format!(
+                write!(
+                    f,
                     "expected 'while', 'for', 'inline', or '{{', found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -301,7 +331,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedParamList => {
-                format!(
+                write!(
+                    f,
                     "expected parameter list, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -311,7 +342,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedPrefixExpr => {
-                format!(
+                write!(
+                    f,
                     "expected prefix expression, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -321,7 +353,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedPrimaryTypeExpr => {
-                format!(
+                write!(
+                    f,
                     "expected primary type expression, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -331,10 +364,11 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedPubItem => {
-                format!("expected function or variable declaration after pub")
+                write!(f, "expected function or variable declaration after pub")
             }
             error::Tag::ExpectedReturnType => {
-                format!(
+                write!(
+                    f,
                     "expected return type expression, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -344,19 +378,21 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedSemiOrElse => {
-                format!("expected ';' or 'else' after statement")
+                write!(f, "expected ';' or 'else' after statement")
             }
             error::Tag::ExpectedSemiOrLBrace => {
-                format!("expected ';' or block after function prototype")
+                write!(f, "expected ';' or block after function prototype")
             }
             error::Tag::ExpectedStatement => {
-                format!(
+                write!(
+                    f,
                     "expected statement, found '{}'",
                     self.token_tag(parse_error.token).symbol(),
                 )
             }
             error::Tag::ExpectedSuffixOp => {
-                format!(
+                write!(
+                    f,
                     "expected pointer dereference, optional unwrap, or field access, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -366,7 +402,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedTypeExpr => {
-                format!(
+                write!(
+                    f,
                     "expected type expression, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -376,7 +413,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedVarDecl => {
-                format!(
+                write!(
+                    f,
                     "expected variable declaration, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -386,7 +424,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedVarDeclOrFn => {
-                format!(
+                write!(
+                    f,
                     "expected variable declaration or function, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -396,7 +435,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedLoopPayload => {
-                format!(
+                write!(
+                    f,
                     "expected loop payload, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -406,7 +446,8 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExpectedContainer => {
-                format!(
+                write!(
+                    f,
                     "expected a struct, enum or union, found '{}'",
                     self.token_tag(match parse_error.token_is_prev {
                         false => parse_error.token,
@@ -416,124 +457,131 @@ impl Ast<'_> {
                 )
             }
             error::Tag::ExternFnBody => {
-                format!("extern functions have no body")
+                write!(f, "extern functions have no body")
             }
             error::Tag::ExtraAddrspaceQualifier => {
-                format!("extra addrspace qualifier")
+                write!(f, "extra addrspace qualifier")
             }
             error::Tag::ExtraAlignQualifier => {
-                format!("extra align qualifier")
+                write!(f, "extra align qualifier")
             }
             error::Tag::ExtraAllowzeroQualifier => {
-                format!("extra allowzero qualifier")
+                write!(f, "extra allowzero qualifier")
             }
             error::Tag::ExtraConstQualifier => {
-                format!("extra const qualifier")
+                write!(f, "extra const qualifier")
             }
             error::Tag::ExtraVolatileQualifier => {
-                format!("extra volatile qualifier")
+                write!(f, "extra volatile qualifier")
             }
             error::Tag::PtrModOnArrayChildType => {
-                format!(
+                write!(
+                    f,
                     "pointer modifier '{}' not allowed on array child type",
                     self.token_tag(parse_error.token).symbol(),
                 )
             }
             error::Tag::InvalidBitRange => {
-                format!("bit range not allowed on slices and arrays")
+                write!(f, "bit range not allowed on slices and arrays")
             }
             error::Tag::SameLineDocComment => {
-                format!("same line documentation comment")
+                write!(f, "same line documentation comment")
             }
             error::Tag::UnattachedDocComment => {
-                format!("unattached documentation comment")
+                write!(f, "unattached documentation comment")
             }
             error::Tag::TestDocComment => {
-                format!("documentation comments cannot be attached to tests")
+                write!(f, "documentation comments cannot be attached to tests")
             }
             error::Tag::ComptimeDocComment => {
-                format!("documentation comments cannot be attached to comptime blocks")
+                write!(
+                    f,
+                    "documentation comments cannot be attached to comptime blocks"
+                )
             }
             error::Tag::VarargsNonfinal => {
-                format!("function prototype has parameter after varargs")
+                write!(f, "function prototype has parameter after varargs")
             }
             error::Tag::ExpectedContinueExpr => {
-                format!("expected ':' before while continue expression")
+                write!(f, "expected ':' before while continue expression")
             }
 
             error::Tag::ExpectedSemiAfterDecl => {
-                format!("expected ';' after declaration")
+                write!(f, "expected ';' after declaration")
             }
             error::Tag::ExpectedSemiAfterStmt => {
-                format!("expected ';' after statement")
+                write!(f, "expected ';' after statement")
             }
             error::Tag::ExpectedCommaAfterField => {
-                format!("expected ',' after field")
+                write!(f, "expected ',' after field")
             }
             error::Tag::ExpectedCommaAfterArg => {
-                format!("expected ',' after argument")
+                write!(f, "expected ',' after argument")
             }
             error::Tag::ExpectedCommaAfterParam => {
-                format!("expected ',' after parameter")
+                write!(f, "expected ',' after parameter")
             }
             error::Tag::ExpectedCommaAfterInitializer => {
-                format!("expected ',' after initializer")
+                write!(f, "expected ',' after initializer")
             }
             error::Tag::ExpectedCommaAfterSwitchProng => {
-                format!("expected ',' after switch prong")
+                write!(f, "expected ',' after switch prong")
             }
             error::Tag::ExpectedCommaAfterForOperand => {
-                format!("expected ',' after for operand")
+                write!(f, "expected ',' after for operand")
             }
             error::Tag::ExpectedCommaAfterCapture => {
-                format!("expected ',' after for capture")
+                write!(f, "expected ',' after for capture")
             }
             error::Tag::ExpectedInitializer => {
-                format!("expected field initializer")
+                write!(f, "expected field initializer")
             }
             error::Tag::MismatchedBinaryOpWhitespace => {
-                format!(
+                write!(
+                    f,
                     "binary operator `{}` has whitespace on one side, but not the other.",
                     self.token_tag(parse_error.token).symbol()
                 )
             }
             error::Tag::InvalidAmpersandAmpersand => {
-                format!("ambiguous use of '&&'; use 'and' for logical AND, or change whitespace to ' & &' for bitwise AND")
+                write!(f,"ambiguous use of '&&'; use 'and' for logical AND, or change whitespace to ' & &' for bitwise AND")
             }
             error::Tag::CStyleContainer(expected_tag) => {
-                format!(
+                write!(
+                    f,
                     "'{} {}' is invalid",
                     expected_tag.symbol(),
                     String::from_utf8_lossy(self.token_slice(parse_error.token)),
                 )
             }
             error::Tag::ZigStyleContainer(expected_tag) => {
-                format!(
+                write!(
+                    f,
                     "to declare a container do 'const {} = {}'",
                     String::from_utf8_lossy(self.token_slice(parse_error.token)),
                     expected_tag.symbol(),
                 )
             }
             error::Tag::PreviousField => {
-                format!("field before declarations here")
+                write!(f, "field before declarations here")
             }
             error::Tag::NextField => {
-                format!("field after declarations here")
+                write!(f, "field after declarations here")
             }
             error::Tag::ExpectedVarConst => {
-                format!("expected 'var' or 'const' before variable declaration")
+                write!(f, "expected 'var' or 'const' before variable declaration")
             }
             error::Tag::WrongEqualVarDecl => {
-                format!("variable initialized with '==' instead of '='")
+                write!(f, "variable initialized with '==' instead of '='")
             }
             error::Tag::VarConstDecl => {
-                format!("use 'var' or 'const' to declare variable")
+                write!(f, "use 'var' or 'const' to declare variable")
             }
             error::Tag::ExtraForCapture => {
-                format!("extra capture in for loop")
+                write!(f, "extra capture in for loop")
             }
             error::Tag::ForInputNotCaptured => {
-                format!("for input is not captured")
+                write!(f, "for input is not captured")
             }
 
             error::Tag::ExpectedToken(expected_tag) => {
@@ -544,9 +592,10 @@ impl Ast<'_> {
                 let expected_symbol = expected_tag.symbol();
                 match found_tag {
                     token::Tag::Invalid => {
-                        format!("expected '{}', found invalid bytes", expected_symbol)
+                        write!(f, "expected '{}', found invalid bytes", expected_symbol)
                     }
-                    _ => format!(
+                    _ => write!(
+                        f,
                         "expected '{}', found '{}'",
                         expected_symbol,
                         found_tag.symbol()
