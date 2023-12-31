@@ -359,20 +359,20 @@ pub struct Tokenizer<'src> {
     pub pending_invalid_token: Option<Token>,
 }
 
-impl Tokenizer<'_> {
+impl<'src> Tokenizer<'src> {
     /// For debugging purposes
     pub fn dump(&self, token: &Token) {
         let string = String::from_utf8_lossy(&self.buffer[token.loc.start..token.loc.end]);
         println!("{:?} \"{}\"", token.tag, string);
     }
 
-    pub fn new(buffer: &[u8]) -> Tokenizer {
+    pub fn new(buffer: &'src [u8]) -> Self {
         // Skip the UTF-8 BOM if present
         let src_start = match buffer {
             &[0xEF, 0xBB, 0xBF, ..] => 3,
             _ => 0,
         };
-        Tokenizer {
+        Self {
             buffer,
             index: src_start,
             pending_invalid_token: None,

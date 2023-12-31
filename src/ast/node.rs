@@ -484,14 +484,14 @@ pub struct Data {
     pub rhs: Index,
 }
 
-pub trait ExtraData<const S: usize>: Sized {
-    fn to_array(&self) -> [Index; S];
+pub trait ExtraData<const N: usize>: Sized {
+    fn to_array(&self) -> [Index; N];
 
     fn from_slice(slice: &[Index]) -> Self;
 
     fn field_range(start: Index) -> std::ops::Range<usize> {
         let start = start as usize;
-        let end = start + S;
+        let end = start + N;
         start..end
     }
 
@@ -518,8 +518,9 @@ macro_rules! extra_data {
             }
         }
 
-        impl GetExtraData<$type> for Ast<'_> {
-            fn extra_data(&self, index: Index) -> $type {
+        impl GetExtraData<'_, $type> for Ast<'_> {
+            type I = Index;
+            fn extra_data(&self, index: Self::I) -> $type {
                 $type::from_ast(self, index)
             }
         }
@@ -617,8 +618,8 @@ extra_data! {
 
 bitfield! {
     pub struct For(Index);
-    pub u32, get_inputs, set_inputs: 30, 0;
-    pub get_has_else, set_has_else: 31;
+    pub u32, inputs, set_inputs: 30, 0;
+    pub has_else, set_has_else: 31;
 }
 
 extra_data! {

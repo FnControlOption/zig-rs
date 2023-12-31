@@ -104,7 +104,7 @@ impl<'src> Ast<'src> {
             ..
         } = parser;
 
-        Ast {
+        Self {
             source,
             mode,
             token_tags,
@@ -116,7 +116,10 @@ impl<'src> Ast<'src> {
     }
 
     pub fn root_decls(&self) -> &[node::Index] {
-        &self.extra_data[self.node(0).data.lhs as usize..self.node(0).data.rhs as usize]
+        let root = self.node(0);
+        let start = root.data.lhs as usize;
+        let end = root.data.rhs as usize;
+        &self.extra_data[start..end]
     }
 
     pub fn get_node_source(&self, node: node::Index) -> &'src [u8] {
@@ -128,12 +131,23 @@ impl<'src> Ast<'src> {
     }
 }
 
-pub trait GetExtraData<T> {
-    fn extra_data(&self, index: node::Index) -> T;
+pub trait GetExtraData<'a, T> {
+    type I;
+    fn extra_data(&'a self, index: Self::I) -> T;
 }
 
-impl GetExtraData<node::Index> for Ast<'_> {
-    fn extra_data(&self, index: node::Index) -> node::Index {
+impl GetExtraData<'_, node::Index> for Ast<'_> {
+    type I = node::Index;
+    fn extra_data(&self, index: Self::I) -> node::Index {
         self.extra_data[index as usize]
     }
 }
+
+impl<'a> GetExtraData<'a, &'a [node::Index]> for Ast<'_> {
+    type I = std::ops::Range<node::Index>;
+    fn extra_data(&'a self, index: Self::I) -> &'a [node::Index] {
+        &self.extra_data[index.start as usize..index.end as usize]
+    }
+}
+
+pub(crate) const UNDEFINED_TOKEN: TokenIndex = TokenIndex::MAX;

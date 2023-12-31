@@ -75,8 +75,8 @@ impl Node {
             }
             PairType::For => {
                 let extra = node::For(rhs);
-                let inputs = extra.get_inputs();
-                let has_else = extra.get_has_else();
+                let inputs = extra.inputs();
+                let has_else = extra.has_else();
                 visitor.accept_extra_children(tree, lhs..lhs + inputs);
                 visitor.accept_extra_child(tree, lhs + inputs);
                 if has_else {

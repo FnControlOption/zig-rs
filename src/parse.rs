@@ -84,7 +84,7 @@ impl<'src> Parser<'src, '_> {
         i as node::Index
     }
 
-    fn add_extra<const S: usize>(&mut self, extra: impl node::ExtraData<S>) -> node::Index {
+    fn add_extra<const N: usize>(&mut self, extra: impl node::ExtraData<{ N }>) -> node::Index {
         let result = self.extra_data.len() as u32;
         let data = extra.to_array();
         self.extra_data.extend_from_slice(&data);
@@ -269,4 +269,3 @@ impl<'src> Parser<'src, '_> {
 
 const NULL_NODE: node::Index = 0;
 const UNDEFINED_NODE: node::Index = node::Index::MAX;
-const UNDEFINED_TOKEN: TokenIndex = TokenIndex::MAX;
