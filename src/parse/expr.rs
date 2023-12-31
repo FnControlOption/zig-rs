@@ -11,7 +11,7 @@ impl Parser<'_, '_> {
     pub(super) fn expect_expr(&mut self) -> Result<node::Index> {
         let node = self.parse_expr()?;
         if node == 0 {
-            self.fail(error!(ExpectedExpr))
+            self.fail(E::ExpectedExpr)
         } else {
             Ok(node)
         }
@@ -122,16 +122,16 @@ impl Parser<'_, '_> {
                 break;
             }
             if info.prec == banned_prec {
-                return self.fail(error!(ChainedComparisonOperators));
+                return self.fail(E::ChainedComparisonOperators);
             }
 
             let oper_token = self.next_token();
-            if tok_tag == token!(KeywordCatch) {
+            if tok_tag == T::KeywordCatch {
                 self.parse_payload()?;
             }
             let rhs = self.parse_expr_precedence(info.prec + 1)?;
             if rhs == 0 {
-                self.warn(error!(ExpectedExpr));
+                self.warn(E::ExpectedExpr);
                 return Ok(node);
             }
 
@@ -140,10 +140,10 @@ impl Parser<'_, '_> {
                 let tok_len = tok_tag.lexeme().unwrap().len();
                 let byte_before = self.source[tok_start - 1];
                 let byte_after = self.source[tok_start + tok_len];
-                if tok_tag == token!(Ampersand) && byte_after == b'&' {
-                    self.warn_msg(Error::new(error!(InvalidAmpersandAmpersand), oper_token));
+                if tok_tag == T::Ampersand && byte_after == b'&' {
+                    self.warn_msg(Error::new(E::InvalidAmpersandAmpersand, oper_token));
                 } else if byte_before.is_ascii_whitespace() != byte_after.is_ascii_whitespace() {
-                    self.warn_msg(Error::new(error!(MismatchedBinaryOpWhitespace), oper_token));
+                    self.warn_msg(Error::new(E::MismatchedBinaryOpWhitespace, oper_token));
                 }
             }
 
@@ -163,13 +163,13 @@ impl Parser<'_, '_> {
 
     pub(super) fn parse_prefix_expr(&mut self) -> Result<node::Index> {
         let tag = match self.token_tag(self.tok_i) {
-            token!(Bang) => node!(BoolNot),
-            token!(Minus) => node!(Negation),
-            token!(Tilde) => node!(BitNot),
-            token!(MinusPercent) => node!(NegationWrap),
-            token!(Ampersand) => node!(AddressOf),
-            token!(KeywordTry) => node!(Try),
-            token!(KeywordAwait) => node!(Await),
+            T::Bang => N::BoolNot,
+            T::Minus => N::Negation,
+            T::Tilde => N::BitNot,
+            T::MinusPercent => N::NegationWrap,
+            T::Ampersand => N::AddressOf,
+            T::KeywordTry => N::Try,
+            T::KeywordAwait => N::Await,
             _ => return self.parse_primary_expr(),
         };
         let main_token = self.next_token();
@@ -185,95 +185,95 @@ impl Parser<'_, '_> {
     pub(super) fn expect_prefix_expr(&mut self) -> Result<node::Index> {
         let node = self.parse_prefix_expr()?;
         if node == 0 {
-            return self.fail(error!(ExpectedPrefixExpr));
+            return self.fail(E::ExpectedPrefixExpr);
         }
         Ok(node)
     }
 
     pub(super) fn parse_primary_expr(&mut self) -> Result<node::Index> {
         match self.token_tag(self.tok_i) {
-            token!(KeywordAsm) => self.expect_asm_expr(),
-            token!(KeywordIf) => self.parse_if_expr(),
-            token!(KeywordBreak) => {
+            T::KeywordAsm => self.expect_asm_expr(),
+            T::KeywordIf => self.parse_if_expr(),
+            T::KeywordBreak => {
                 let main_token = self.next_token();
                 let lhs = self.parse_break_label()?;
                 let rhs = self.parse_expr()?;
                 Ok(self.add_node(Node {
-                    tag: node!(Break),
+                    tag: N::Break,
                     main_token,
                     data: node::Data { lhs, rhs },
                 }))
             }
-            token!(KeywordContinue) => {
+            T::KeywordContinue => {
                 let main_token = self.next_token();
                 let lhs = self.parse_break_label()?;
                 let rhs = UNDEFINED_NODE;
                 Ok(self.add_node(Node {
-                    tag: node!(Continue),
+                    tag: N::Continue,
                     main_token,
                     data: node::Data { lhs, rhs },
                 }))
             }
-            token!(KeywordComptime) => {
+            T::KeywordComptime => {
                 let main_token = self.next_token();
                 let lhs = self.expect_expr()?;
                 let rhs = UNDEFINED_NODE;
                 Ok(self.add_node(Node {
-                    tag: node!(Comptime),
+                    tag: N::Comptime,
                     main_token,
                     data: node::Data { lhs, rhs },
                 }))
             }
-            token!(KeywordNosuspend) => {
+            T::KeywordNosuspend => {
                 let main_token = self.next_token();
                 let lhs = self.expect_expr()?;
                 let rhs = UNDEFINED_NODE;
                 Ok(self.add_node(Node {
-                    tag: node!(Nosuspend),
+                    tag: N::Nosuspend,
                     main_token,
                     data: node::Data { lhs, rhs },
                 }))
             }
-            token!(KeywordResume) => {
+            T::KeywordResume => {
                 let main_token = self.next_token();
                 let lhs = self.expect_expr()?;
                 let rhs = UNDEFINED_NODE;
                 Ok(self.add_node(Node {
-                    tag: node!(Resume),
+                    tag: N::Resume,
                     main_token,
                     data: node::Data { lhs, rhs },
                 }))
             }
-            token!(KeywordReturn) => {
+            T::KeywordReturn => {
                 let main_token = self.next_token();
                 let lhs = self.parse_expr()?;
                 let rhs = UNDEFINED_NODE;
                 Ok(self.add_node(Node {
-                    tag: node!(Return),
+                    tag: N::Return,
                     main_token,
                     data: node::Data { lhs, rhs },
                 }))
             }
-            token!(Identifier) => {
-                if self.token_tag(self.tok_i + 1) == token!(Colon) {
+            T::Identifier => {
+                if self.token_tag(self.tok_i + 1) == T::Colon {
                     match self.token_tag(self.tok_i + 2) {
-                        token!(KeywordInline) => {
+                        T::KeywordInline => {
                             self.tok_i += 3;
                             match self.token_tag(self.tok_i) {
-                                token!(KeywordFor) => self.parse_for(Self::expect_expr),
-                                token!(KeywordWhile) => self.parse_while_expr(),
-                                _ => self.fail(error!(ExpectedInlinable)),
+                                T::KeywordFor => self.parse_for(Self::expect_expr),
+                                T::KeywordWhile => self.parse_while_expr(),
+                                _ => self.fail(E::ExpectedInlinable),
                             }
                         }
-                        token!(KeywordFor) => {
+                        T::KeywordFor => {
                             self.tok_i += 2;
                             self.parse_for(Self::expect_expr)
                         }
-                        token!(KeywordWhile) => {
+                        T::KeywordWhile => {
                             self.tok_i += 2;
                             self.parse_while_expr()
                         }
-                        token!(LBrace) => {
+                        T::LBrace => {
                             self.tok_i += 2;
                             self.parse_block()
                         }
@@ -283,17 +283,17 @@ impl Parser<'_, '_> {
                     self.parse_curly_suffix_expr()
                 }
             }
-            token!(KeywordInline) => {
+            T::KeywordInline => {
                 self.tok_i += 1;
                 match self.token_tag(self.tok_i) {
-                    token!(KeywordFor) => self.parse_for(Self::expect_expr),
-                    token!(KeywordWhile) => self.parse_while_expr(),
-                    _ => self.fail(error!(ExpectedInlinable)),
+                    T::KeywordFor => self.parse_for(Self::expect_expr),
+                    T::KeywordWhile => self.parse_while_expr(),
+                    _ => self.fail(E::ExpectedInlinable),
                 }
             }
-            token!(KeywordFor) => self.parse_for(Self::expect_expr),
-            token!(KeywordWhile) => self.parse_while_expr(),
-            token!(LBrace) => self.parse_block(),
+            T::KeywordFor => self.parse_for(Self::expect_expr),
+            T::KeywordWhile => self.parse_while_expr(),
+            T::LBrace => self.parse_block(),
             _ => self.parse_curly_suffix_expr(),
         }
     }
@@ -303,7 +303,7 @@ impl Parser<'_, '_> {
         if lhs == 0 {
             return Ok(NULL_NODE);
         }
-        let Some(lbrace) = self.eat_token(token!(LBrace)) else {
+        let Some(lbrace) = self.eat_token(T::LBrace) else {
             return Ok(lhs);
         };
 
@@ -313,29 +313,29 @@ impl Parser<'_, '_> {
             inits.push(field_init);
             loop {
                 match self.token_tag(self.tok_i) {
-                    token!(Comma) => self.tok_i += 1,
-                    token!(RBrace) => {
+                    T::Comma => self.tok_i += 1,
+                    T::RBrace => {
                         self.tok_i += 1;
                         break;
                     }
-                    token!(Colon) | token!(RParen) | token!(RBracket) => {
-                        return self.fail_expected(token!(RBrace));
+                    T::Colon | T::RParen | T::RBracket => {
+                        return self.fail_expected(T::RBrace);
                     }
-                    _ => self.warn(error!(ExpectedCommaAfterInitializer)),
+                    _ => self.warn(E::ExpectedCommaAfterInitializer),
                 }
-                if self.eat_token(token!(RBrace)).is_some() {
+                if self.eat_token(T::RBrace).is_some() {
                     break;
                 }
                 let next = self.expect_field_init()?;
                 inits.push(next);
             }
-            let comma = self.token_tag(self.tok_i - 2) == token!(Comma);
+            let comma = self.token_tag(self.tok_i - 2) == T::Comma;
             return match inits[..] {
                 [] => unreachable!(),
                 [rhs] => Ok(self.add_node(Node {
                     tag: match comma {
-                        true => node!(StructInitOneComma),
-                        false => node!(StructInitOne),
+                        true => N::StructInitOneComma,
+                        false => N::StructInitOne,
                     },
                     main_token: lbrace,
                     data: node::Data { lhs, rhs },
@@ -345,8 +345,8 @@ impl Parser<'_, '_> {
                     let rhs = self.add_extra(span);
                     Ok(self.add_node(Node {
                         tag: match comma {
-                            true => node!(StructInitComma),
-                            false => node!(StructInit),
+                            true => N::StructInitComma,
+                            false => N::StructInit,
                         },
                         main_token: lbrace,
                         data: node::Data { lhs, rhs },
@@ -356,34 +356,34 @@ impl Parser<'_, '_> {
         }
 
         loop {
-            if self.eat_token(token!(RBrace)).is_some() {
+            if self.eat_token(T::RBrace).is_some() {
                 break;
             }
             let elem_init = self.expect_expr()?;
             inits.push(elem_init);
             match self.token_tag(self.tok_i) {
-                token!(Comma) => self.tok_i += 1,
-                token!(RBrace) => {
+                T::Comma => self.tok_i += 1,
+                T::RBrace => {
                     self.tok_i += 1;
                     break;
                 }
-                token!(Colon) | token!(RParen) | token!(RBracket) => {
-                    return self.fail_expected(token!(RBrace));
+                T::Colon | T::RParen | T::RBracket => {
+                    return self.fail_expected(T::RBrace);
                 }
-                _ => self.warn(error!(ExpectedCommaAfterInitializer)),
+                _ => self.warn(E::ExpectedCommaAfterInitializer),
             }
         }
-        let comma = self.token_tag(self.tok_i - 2) == token!(Comma);
+        let comma = self.token_tag(self.tok_i - 2) == T::Comma;
         match inits[..] {
             [] => Ok(self.add_node(Node {
-                tag: node!(StructInitOne),
+                tag: N::StructInitOne,
                 main_token: lbrace,
                 data: node::Data { lhs, rhs: 0 },
             })),
             [rhs] => Ok(self.add_node(Node {
                 tag: match comma {
-                    true => node!(ArrayInitOneComma),
-                    false => node!(ArrayInitOne),
+                    true => N::ArrayInitOneComma,
+                    false => N::ArrayInitOne,
                 },
                 main_token: lbrace,
                 data: node::Data { lhs, rhs },
@@ -393,8 +393,8 @@ impl Parser<'_, '_> {
                 let rhs = self.add_extra(span);
                 Ok(self.add_node(Node {
                     tag: match comma {
-                        true => node!(ArrayInitComma),
-                        false => node!(ArrayInit),
+                        true => N::ArrayInitComma,
+                        false => N::ArrayInit,
                     },
                     main_token: lbrace,
                     data: node::Data { lhs, rhs },
@@ -404,9 +404,9 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn parse_break_label(&mut self) -> Result<TokenIndex> {
-        match self.eat_token(token!(Colon)) {
+        match self.eat_token(T::Colon) {
             None => Ok(NULL_NODE),
-            Some(_) => self.expect_token(token!(Identifier)),
+            Some(_) => self.expect_token(T::Identifier),
         }
     }
 }

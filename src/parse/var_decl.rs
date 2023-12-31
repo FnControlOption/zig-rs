@@ -3,14 +3,14 @@ use super::*;
 impl Parser<'_, '_> {
     pub(super) fn parse_var_decl_proto(&mut self) -> Result<node::Index> {
         let Some(mut_token) = self
-            .eat_token(token!(KeywordConst))
-            .or_else(|| self.eat_token(token!(KeywordVar)))
+            .eat_token(T::KeywordConst)
+            .or_else(|| self.eat_token(T::KeywordVar))
         else {
             return Ok(NULL_NODE);
         };
 
-        self.expect_token(token!(Identifier))?;
-        let type_node = match self.eat_token(token!(Colon)) {
+        self.expect_token(T::Identifier)?;
+        let type_node = match self.eat_token(T::Colon) {
             None => 0,
             Some(_) => self.expect_type_expr()?,
         };
@@ -21,7 +21,7 @@ impl Parser<'_, '_> {
         if section_node == 0 && addrspace_node == 0 {
             if align_node == 0 {
                 return Ok(self.add_node(Node {
-                    tag: node!(SimpleVarDecl),
+                    tag: N::SimpleVarDecl,
                     main_token: mut_token,
                     data: node::Data {
                         lhs: type_node,
@@ -32,7 +32,7 @@ impl Parser<'_, '_> {
 
             if type_node == 0 {
                 return Ok(self.add_node(Node {
-                    tag: node!(AlignedVarDecl),
+                    tag: N::AlignedVarDecl,
                     main_token: mut_token,
                     data: node::Data {
                         lhs: align_node,
@@ -46,7 +46,7 @@ impl Parser<'_, '_> {
                 align_node,
             });
             Ok(self.add_node(Node {
-                tag: node!(LocalVarDecl),
+                tag: N::LocalVarDecl,
                 main_token: mut_token,
                 data: node::Data { lhs, rhs: 0 },
             }))
@@ -58,7 +58,7 @@ impl Parser<'_, '_> {
                 section_node,
             });
             Ok(self.add_node(Node {
-                tag: node!(GlobalVarDecl),
+                tag: N::GlobalVarDecl,
                 main_token: mut_token,
                 data: node::Data { lhs, rhs: 0 },
             }))
@@ -72,12 +72,12 @@ impl Parser<'_, '_> {
         }
 
         let init_node = match self.token_tag(self.tok_i) {
-            token!(EqualEqual) => {
-                self.warn(error!(WrongEqualVarDecl));
+            T::EqualEqual => {
+                self.warn(E::WrongEqualVarDecl);
                 self.tok_i += 1;
                 self.expect_expr()?
             }
-            token!(Equal) => {
+            T::Equal => {
                 self.tok_i += 1;
                 self.expect_expr()?
             }
@@ -86,7 +86,7 @@ impl Parser<'_, '_> {
 
         self.node_mut(var_decl).data.rhs = init_node;
 
-        self.expect_semicolon(error!(ExpectedSemiAfterDecl), false)?;
+        self.expect_semicolon(E::ExpectedSemiAfterDecl, false)?;
         Ok(var_decl)
     }
 
@@ -104,14 +104,14 @@ impl Parser<'_, '_> {
                 let expr = self.parse_expr()?;
                 if expr == 0 {
                     if scratch.len() == 0 {
-                        return self.fail(error!(ExpectedStatement));
+                        return self.fail(E::ExpectedStatement);
                     } else {
-                        return self.fail(error!(ExpectedExprOrVarDecl));
+                        return self.fail(E::ExpectedExprOrVarDecl);
                     }
                 }
                 scratch.push(expr);
             }
-            if self.eat_token(token!(Comma)).is_none() {
+            if self.eat_token(T::Comma).is_none() {
                 break;
             }
         }
@@ -119,35 +119,32 @@ impl Parser<'_, '_> {
         let lhs_count = scratch.len();
         assert!(lhs_count > 0);
 
-        let equal_token = match self.eat_token(token!(Equal)) {
+        let equal_token = match self.eat_token(T::Equal) {
             Some(token) => token,
             None => 'eql: {
                 let [lhs] = scratch[..] else {
-                    if let Some(tok) = self.eat_token(token!(EqualEqual)) {
-                        self.warn_msg(Error::new(error!(WrongEqualVarDecl), tok));
+                    if let Some(tok) = self.eat_token(T::EqualEqual) {
+                        self.warn_msg(Error::new(E::WrongEqualVarDecl, tok));
                         break 'eql tok;
                     }
-                    return self.fail_expected(token!(Equal));
+                    return self.fail_expected(T::Equal);
                 };
                 match self.node(lhs).tag {
-                    node!(GlobalVarDecl)
-                    | node!(LocalVarDecl)
-                    | node!(SimpleVarDecl)
-                    | node!(AlignedVarDecl) => {
-                        if let Some(tok) = self.eat_token(token!(EqualEqual)) {
-                            self.warn_msg(Error::new(error!(WrongEqualVarDecl), tok));
+                    N::GlobalVarDecl | N::LocalVarDecl | N::SimpleVarDecl | N::AlignedVarDecl => {
+                        if let Some(tok) = self.eat_token(T::EqualEqual) {
+                            self.warn_msg(Error::new(E::WrongEqualVarDecl, tok));
                             break 'eql tok;
                         }
-                        return self.fail_expected(token!(Equal));
+                        return self.fail_expected(T::Equal);
                     }
                     _ => {}
                 }
 
                 let expr = self.finish_assign_expr(lhs)?;
-                self.expect_semicolon(error!(ExpectedSemiAfterStmt), true)?;
+                self.expect_semicolon(E::ExpectedSemiAfterStmt, true)?;
                 if let Some(t) = comptime_token {
                     return Ok(self.add_node(Node {
-                        tag: node!(Comptime),
+                        tag: N::Comptime,
                         main_token: t,
                         data: node::Data {
                             lhs: expr,
@@ -161,27 +158,24 @@ impl Parser<'_, '_> {
         };
 
         let rhs = self.expect_expr()?;
-        self.expect_semicolon(error!(ExpectedSemiAfterStmt), true)?;
+        self.expect_semicolon(E::ExpectedSemiAfterStmt, true)?;
 
         if let [lhs] = scratch[..] {
             match self.node(lhs).tag {
-                node!(GlobalVarDecl)
-                | node!(LocalVarDecl)
-                | node!(SimpleVarDecl)
-                | node!(AlignedVarDecl) => {
+                N::GlobalVarDecl | N::LocalVarDecl | N::SimpleVarDecl | N::AlignedVarDecl => {
                     self.node_mut(lhs).data.rhs = rhs;
                     return Ok(lhs);
                 }
                 _ => {}
             }
             let expr = self.add_node(Node {
-                tag: node!(Assign),
+                tag: N::Assign,
                 main_token: equal_token,
                 data: node::Data { lhs, rhs },
             });
             if let Some(t) = comptime_token {
                 return Ok(self.add_node(Node {
-                    tag: node!(Comptime),
+                    tag: N::Comptime,
                     main_token: t,
                     data: node::Data {
                         lhs: expr,
@@ -199,7 +193,7 @@ impl Parser<'_, '_> {
         self.extra_data.append(&mut scratch);
 
         Ok(self.add_node(Node {
-            tag: node!(AssignDestructure),
+            tag: N::AssignDestructure,
             main_token: equal_token,
             data: node::Data {
                 lhs: extra_start as node::Index,

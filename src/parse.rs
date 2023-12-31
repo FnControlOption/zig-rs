@@ -1,7 +1,10 @@
 use crate::ast;
 use crate::ast::{error, node, Error, Node, TokenIndex};
-use crate::macros::*;
 use crate::token;
+
+use crate::ast::error::Tag as E;
+use crate::ast::node::Tag as N;
+use crate::token::Tag as T;
 
 mod misc;
 
@@ -90,7 +93,7 @@ impl Parser<'_, '_> {
         i as node::Index
     }
 
-    fn add_extra<const N: usize>(&mut self, extra: impl node::ExtraData<N>) -> node::Index {
+    fn add_extra<const S: usize>(&mut self, extra: impl node::ExtraData<S>) -> node::Index {
         let result = self.extra_data.len() as u32;
         let data = extra.to_array();
         self.extra_data.extend_from_slice(&data);
@@ -99,10 +102,7 @@ impl Parser<'_, '_> {
 
     #[cold]
     fn warn_expected(&mut self, expected_token: token::Tag) {
-        self.warn_msg(Error::new(
-            error!(ExpectedToken(expected_token)),
-            self.tok_i,
-        ));
+        self.warn_msg(Error::new(E::ExpectedToken(expected_token), self.tok_i));
     }
 
     #[cold]
@@ -113,38 +113,38 @@ impl Parser<'_, '_> {
     #[cold]
     fn warn_msg(&mut self, mut msg: Error) {
         match msg.tag {
-            error!(ExpectedSemiAfterDecl)
-            | error!(ExpectedSemiAfterStmt)
-            | error!(ExpectedCommaAfterField)
-            | error!(ExpectedCommaAfterArg)
-            | error!(ExpectedCommaAfterParam)
-            | error!(ExpectedCommaAfterInitializer)
-            | error!(ExpectedCommaAfterSwitchProng)
-            | error!(ExpectedCommaAfterForOperand)
-            | error!(ExpectedCommaAfterCapture)
-            | error!(ExpectedSemiOrElse)
-            | error!(ExpectedSemiOrLBrace)
-            | error!(ExpectedToken(_))
-            | error!(ExpectedBlock)
-            | error!(ExpectedBlockOrAssignment)
-            | error!(ExpectedBlockOrExpr)
-            | error!(ExpectedBlockOrField)
-            | error!(ExpectedExpr)
-            | error!(ExpectedExprOrAssignment)
-            | error!(ExpectedFn)
-            | error!(ExpectedInlinable)
-            | error!(ExpectedLabelable)
-            | error!(ExpectedParamList)
-            | error!(ExpectedPrefixExpr)
-            | error!(ExpectedPrimaryTypeExpr)
-            | error!(ExpectedPubItem)
-            | error!(ExpectedReturnType)
-            | error!(ExpectedSuffixOp)
-            | error!(ExpectedTypeExpr)
-            | error!(ExpectedVarDecl)
-            | error!(ExpectedVarDeclOrFn)
-            | error!(ExpectedLoopPayload)
-            | error!(ExpectedContainer) => {
+            E::ExpectedSemiAfterDecl
+            | E::ExpectedSemiAfterStmt
+            | E::ExpectedCommaAfterField
+            | E::ExpectedCommaAfterArg
+            | E::ExpectedCommaAfterParam
+            | E::ExpectedCommaAfterInitializer
+            | E::ExpectedCommaAfterSwitchProng
+            | E::ExpectedCommaAfterForOperand
+            | E::ExpectedCommaAfterCapture
+            | E::ExpectedSemiOrElse
+            | E::ExpectedSemiOrLBrace
+            | E::ExpectedToken(_)
+            | E::ExpectedBlock
+            | E::ExpectedBlockOrAssignment
+            | E::ExpectedBlockOrExpr
+            | E::ExpectedBlockOrField
+            | E::ExpectedExpr
+            | E::ExpectedExprOrAssignment
+            | E::ExpectedFn
+            | E::ExpectedInlinable
+            | E::ExpectedLabelable
+            | E::ExpectedParamList
+            | E::ExpectedPrefixExpr
+            | E::ExpectedPrimaryTypeExpr
+            | E::ExpectedPubItem
+            | E::ExpectedReturnType
+            | E::ExpectedSuffixOp
+            | E::ExpectedTypeExpr
+            | E::ExpectedVarDecl
+            | E::ExpectedVarDeclOrFn
+            | E::ExpectedLoopPayload
+            | E::ExpectedContainer => {
                 if msg.token != 0 && !self.tokens_on_same_line(msg.token - 1, msg.token) {
                     msg.token_is_prev = true;
                     msg.token -= 1;
@@ -163,10 +163,7 @@ impl Parser<'_, '_> {
 
     #[cold]
     fn fail_expected<T>(&mut self, expected_token: token::Tag) -> Result<T> {
-        self.fail_msg(Error::new(
-            error!(ExpectedToken(expected_token)),
-            self.tok_i,
-        ))
+        self.fail_msg(Error::new(E::ExpectedToken(expected_token), self.tok_i))
     }
 
     #[cold]
@@ -177,7 +174,7 @@ impl Parser<'_, '_> {
 
     pub fn parse_root(&mut self) {
         self.nodes.push(Node {
-            tag: node!(Root),
+            tag: N::Root,
             main_token: 0,
             data: node::Data {
                 lhs: UNDEFINED_NODE,
@@ -186,8 +183,8 @@ impl Parser<'_, '_> {
         });
         let root_members = self.parse_container_members();
         let root_decls = root_members.to_span(self);
-        if self.token_tag(self.tok_i) != token!(Eof) {
-            self.warn_expected(token!(Eof));
+        if self.token_tag(self.tok_i) != T::Eof {
+            self.warn_expected(T::Eof);
         }
         self.nodes[0].data = node::Data {
             lhs: root_decls.start,
@@ -197,7 +194,7 @@ impl Parser<'_, '_> {
 
     pub fn parse_zon(&mut self) {
         self.nodes.push(Node {
-            tag: node!(Root),
+            tag: N::Root,
             main_token: 0,
             data: node::Data {
                 lhs: UNDEFINED_NODE,
@@ -208,8 +205,8 @@ impl Parser<'_, '_> {
             assert!(self.errors.len() > 0);
             return;
         };
-        if self.token_tag(self.tok_i) != token!(Eof) {
-            self.warn_expected(token!(Eof));
+        if self.token_tag(self.tok_i) != T::Eof {
+            self.warn_expected(T::Eof);
         }
         self.nodes[0].data = node::Data {
             lhs: node_index,
@@ -218,17 +215,17 @@ impl Parser<'_, '_> {
     }
 
     fn eat_doc_comments(&mut self) -> Option<TokenIndex> {
-        if let Some(tok) = self.eat_token(token!(DocComment)) {
+        if let Some(tok) = self.eat_token(T::DocComment) {
             let mut first_line = tok;
             if tok > 0 && self.tokens_on_same_line(tok - 1, tok) {
-                self.warn_msg(Error::new(error!(SameLineDocComment), tok));
+                self.warn_msg(Error::new(E::SameLineDocComment, tok));
                 // TODO(zig-rs): is there a better way to assign to `first_line` without needing `tmp`?
-                let Some(tmp) = self.eat_token(token!(DocComment)) else {
+                let Some(tmp) = self.eat_token(T::DocComment) else {
                     return None;
                 };
                 first_line = tmp;
             }
-            while self.eat_token(token!(DocComment)).is_some() {}
+            while self.eat_token(T::DocComment).is_some() {}
             return Some(first_line);
         }
         None
@@ -255,13 +252,13 @@ impl Parser<'_, '_> {
 
     fn expect_token(&mut self, tag: token::Tag) -> Result<TokenIndex> {
         if self.token_tag(self.tok_i) != tag {
-            return self.fail_msg(Error::new(error!(ExpectedToken(tag)), self.tok_i));
+            return self.fail_msg(Error::new(E::ExpectedToken(tag), self.tok_i));
         }
         Ok(self.next_token())
     }
 
     fn expect_semicolon(&mut self, error_tag: error::Tag, recoverable: bool) -> Result<()> {
-        if self.token_tag(self.tok_i) == token!(Semicolon) {
+        if self.token_tag(self.tok_i) == T::Semicolon {
             self.next_token();
             return Ok(());
         }

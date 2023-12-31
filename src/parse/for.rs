@@ -2,7 +2,7 @@ use super::*;
 
 impl Parser<'_, '_> {
     pub(super) fn parse_for_statement(&mut self) -> Result<node::Index> {
-        let Some(for_token) = self.eat_token(token!(KeywordFor)) else {
+        let Some(for_token) = self.eat_token(T::KeywordFor) else {
             return Ok(NULL_NODE);
         };
 
@@ -18,9 +18,9 @@ impl Parser<'_, '_> {
             }
             let assign_expr = self.parse_assign_expr()?;
             if assign_expr == 0 {
-                return self.fail(error!(ExpectedBlockOrAssignment));
+                return self.fail(E::ExpectedBlockOrAssignment);
             }
-            if self.eat_token(token!(Semicolon)).is_some() {
+            if self.eat_token(T::Semicolon).is_some() {
                 seen_semicolon = true;
                 break 'blk assign_expr;
             }
@@ -28,17 +28,17 @@ impl Parser<'_, '_> {
             assign_expr
         };
         let mut has_else = false;
-        if !seen_semicolon && self.eat_token(token!(KeywordElse)).is_some() {
+        if !seen_semicolon && self.eat_token(T::KeywordElse).is_some() {
             scratch.push(then_expr);
             let else_stmt = self.expect_statement(false)?;
             scratch.push(else_stmt);
             has_else = true;
         } else if let [lhs] = scratch[..] {
             if else_required {
-                self.warn(error!(ExpectedSemiOrElse));
+                self.warn(E::ExpectedSemiOrElse);
             }
             return Ok(self.add_node(Node {
-                tag: node!(ForSimple),
+                tag: N::ForSimple,
                 main_token: for_token,
                 data: node::Data {
                     lhs,
@@ -47,7 +47,7 @@ impl Parser<'_, '_> {
             }));
         } else {
             if else_required {
-                self.warn(error!(ExpectedSemiOrElse));
+                self.warn(E::ExpectedSemiOrElse);
             }
             scratch.push(then_expr);
         }
@@ -59,7 +59,7 @@ impl Parser<'_, '_> {
             extra.0
         };
         Ok(self.add_node(Node {
-            tag: node!(For),
+            tag: N::For,
             main_token: for_token,
             data: node::Data { lhs, rhs },
         }))
@@ -67,14 +67,14 @@ impl Parser<'_, '_> {
 
     pub(super) fn for_prefix(&mut self, scratch: &mut Vec<node::Index>) -> Result<usize> {
         let start = scratch.len();
-        self.expect_token(token!(LParen))?;
+        self.expect_token(T::LParen)?;
 
         loop {
             let mut input = self.expect_expr()?;
-            if let Some(ellipsis) = self.eat_token(token!(Ellipsis2)) {
+            if let Some(ellipsis) = self.eat_token(T::Ellipsis2) {
                 let rhs = self.parse_expr()?;
                 input = self.add_node(Node {
-                    tag: node!(ForRange),
+                    tag: N::ForRange,
                     main_token: ellipsis,
                     data: node::Data { lhs: input, rhs },
                 });
@@ -82,46 +82,44 @@ impl Parser<'_, '_> {
 
             scratch.push(input);
             match self.token_tag(self.tok_i) {
-                token!(Comma) => self.tok_i += 1,
-                token!(RParen) => {
+                T::Comma => self.tok_i += 1,
+                T::RParen => {
                     self.tok_i += 1;
                     break;
                 }
-                token!(Colon) | token!(RBrace) | token!(RBracket) => {
-                    return self.fail_expected(token!(RParen))
-                }
-                _ => self.warn(error!(ExpectedCommaAfterForOperand)),
+                T::Colon | T::RBrace | T::RBracket => return self.fail_expected(T::RParen),
+                _ => self.warn(E::ExpectedCommaAfterForOperand),
             }
-            if self.eat_token(token!(RParen)).is_some() {
+            if self.eat_token(T::RParen).is_some() {
                 break;
             }
         }
         let inputs = scratch.len() - start;
 
-        if self.eat_token(token!(Pipe)).is_none() {
-            self.warn(error!(ExpectedLoopPayload));
+        if self.eat_token(T::Pipe).is_none() {
+            self.warn(E::ExpectedLoopPayload);
             return Ok(inputs);
         }
 
         let mut warned_excess = false;
         let mut captures: usize = 0;
         loop {
-            self.eat_token(token!(Asterisk));
-            let identifier = self.expect_token(token!(Identifier))?;
+            self.eat_token(T::Asterisk);
+            let identifier = self.expect_token(T::Identifier)?;
             captures += 1;
             if captures > inputs && !warned_excess {
-                self.warn_msg(Error::new(error!(ExtraForCapture), identifier));
+                self.warn_msg(Error::new(E::ExtraForCapture, identifier));
                 warned_excess = true;
             }
             match self.token_tag(self.tok_i) {
-                token!(Comma) => self.tok_i += 1,
-                token!(Pipe) => {
+                T::Comma => self.tok_i += 1,
+                T::Pipe => {
                     self.tok_i += 1;
                     break;
                 }
-                _ => self.warn(error!(ExpectedCommaAfterCapture)),
+                _ => self.warn(E::ExpectedCommaAfterCapture),
             }
-            if self.eat_token(token!(Pipe)).is_some() {
+            if self.eat_token(T::Pipe).is_some() {
                 break;
             }
         }
@@ -129,7 +127,7 @@ impl Parser<'_, '_> {
         if captures < inputs {
             let index = scratch.len() - captures;
             let input = self.node(scratch[index]).main_token;
-            self.warn_msg(Error::new(error!(ForInputNotCaptured), input));
+            self.warn_msg(Error::new(E::ForInputNotCaptured, input));
         }
         Ok(inputs)
     }
@@ -138,7 +136,7 @@ impl Parser<'_, '_> {
         &mut self,
         mut body_parse_fn: impl FnMut(&mut Self) -> Result<node::Index>,
     ) -> Result<node::Index> {
-        let Some(for_token) = self.eat_token(token!(KeywordFor)) else {
+        let Some(for_token) = self.eat_token(T::KeywordFor) else {
             return Ok(NULL_NODE);
         };
 
@@ -147,14 +145,14 @@ impl Parser<'_, '_> {
 
         let then_expr = body_parse_fn(self)?;
         let mut has_else = false;
-        if self.eat_token(token!(KeywordElse)).is_some() {
+        if self.eat_token(T::KeywordElse).is_some() {
             scratch.push(then_expr);
             let else_expr = body_parse_fn(self)?;
             scratch.push(else_expr);
             has_else = true;
         } else if let [lhs] = scratch[..] {
             return Ok(self.add_node(Node {
-                tag: node!(ForSimple),
+                tag: N::ForSimple,
                 main_token: for_token,
                 data: node::Data {
                     lhs,
@@ -172,7 +170,7 @@ impl Parser<'_, '_> {
             extra.0
         };
         Ok(self.add_node(Node {
-            tag: node!(For),
+            tag: N::For,
             main_token: for_token,
             data: node::Data { lhs, rhs },
         }))

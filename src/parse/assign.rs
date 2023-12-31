@@ -28,7 +28,7 @@ impl Parser<'_, '_> {
 
     pub(super) fn finish_assign_expr(&mut self, lhs: node::Index) -> Result<node::Index> {
         let tok = self.token_tag(self.tok_i);
-        if tok == token!(Comma) {
+        if tok == T::Comma {
             return self.finish_assign_destructure_expr(lhs);
         }
         let Some(tag) = Self::assign_op_node(tok) else {
@@ -45,24 +45,24 @@ impl Parser<'_, '_> {
 
     pub(super) fn assign_op_node(tok: token::Tag) -> Option<node::Tag> {
         match tok {
-            token!(AsteriskEqual) => Some(node!(AssignMul)),
-            token!(SlashEqual) => Some(node!(AssignDiv)),
-            token!(PercentEqual) => Some(node!(AssignMod)),
-            token!(PlusEqual) => Some(node!(AssignAdd)),
-            token!(MinusEqual) => Some(node!(AssignSub)),
-            token!(AngleBracketAngleBracketLeftEqual) => Some(node!(AssignShl)),
-            token!(AngleBracketAngleBracketLeftPipeEqual) => Some(node!(AssignShlSat)),
-            token!(AngleBracketAngleBracketRightEqual) => Some(node!(AssignShr)),
-            token!(AmpersandEqual) => Some(node!(AssignBitAnd)),
-            token!(CaretEqual) => Some(node!(AssignBitXor)),
-            token!(PipeEqual) => Some(node!(AssignBitOr)),
-            token!(AsteriskPercentEqual) => Some(node!(AssignMulWrap)),
-            token!(PlusPercentEqual) => Some(node!(AssignAddWrap)),
-            token!(MinusPercentEqual) => Some(node!(AssignSubWrap)),
-            token!(AsteriskPipeEqual) => Some(node!(AssignMulSat)),
-            token!(PlusPipeEqual) => Some(node!(AssignAddSat)),
-            token!(MinusPipeEqual) => Some(node!(AssignSubSat)),
-            token!(Equal) => Some(node!(Assign)),
+            T::AsteriskEqual => Some(N::AssignMul),
+            T::SlashEqual => Some(N::AssignDiv),
+            T::PercentEqual => Some(N::AssignMod),
+            T::PlusEqual => Some(N::AssignAdd),
+            T::MinusEqual => Some(N::AssignSub),
+            T::AngleBracketAngleBracketLeftEqual => Some(N::AssignShl),
+            T::AngleBracketAngleBracketLeftPipeEqual => Some(N::AssignShlSat),
+            T::AngleBracketAngleBracketRightEqual => Some(N::AssignShr),
+            T::AmpersandEqual => Some(N::AssignBitAnd),
+            T::CaretEqual => Some(N::AssignBitXor),
+            T::PipeEqual => Some(N::AssignBitOr),
+            T::AsteriskPercentEqual => Some(N::AssignMulWrap),
+            T::PlusPercentEqual => Some(N::AssignAddWrap),
+            T::MinusPercentEqual => Some(N::AssignSubWrap),
+            T::AsteriskPipeEqual => Some(N::AssignMulSat),
+            T::PlusPipeEqual => Some(N::AssignAddSat),
+            T::MinusPipeEqual => Some(N::AssignSubSat),
+            T::Equal => Some(N::Assign),
             _ => None,
         }
     }
@@ -75,12 +75,12 @@ impl Parser<'_, '_> {
 
         scratch.push(first_lhs);
 
-        while self.eat_token(token!(Comma)).is_some() {
+        while self.eat_token(T::Comma).is_some() {
             let expr = self.expect_expr()?;
             scratch.push(expr);
         }
 
-        let equal_token = self.expect_token(token!(Equal))?;
+        let equal_token = self.expect_token(T::Equal)?;
 
         let rhs = self.expect_expr()?;
 
@@ -93,7 +93,7 @@ impl Parser<'_, '_> {
         self.extra_data.append(&mut scratch);
 
         Ok(self.add_node(Node {
-            tag: node!(AssignDestructure),
+            tag: N::AssignDestructure,
             main_token: equal_token,
             data: node::Data {
                 lhs: extra_start as node::Index,
@@ -105,7 +105,7 @@ impl Parser<'_, '_> {
     pub(super) fn expect_single_assign_expr(&mut self) -> Result<node::Index> {
         let expr = self.parse_single_assign_expr()?;
         if expr == 0 {
-            return self.fail(error!(ExpectedExprOrAssignment));
+            return self.fail(E::ExpectedExprOrAssignment);
         }
         Ok(expr)
     }
@@ -113,7 +113,7 @@ impl Parser<'_, '_> {
     pub(super) fn expect_assign_expr(&mut self) -> Result<node::Index> {
         let expr = self.parse_assign_expr()?;
         if expr == 0 {
-            return self.fail(error!(ExpectedExprOrAssignment));
+            return self.fail(E::ExpectedExprOrAssignment);
         }
         Ok(expr)
     }

@@ -2,14 +2,14 @@ use super::*;
 
 impl Parser<'_, '_> {
     pub(super) fn expect_switch_expr(&mut self) -> Result<node::Index> {
-        let switch_token = self.assert_token(token!(KeywordSwitch));
-        self.expect_token(token!(LParen))?;
+        let switch_token = self.assert_token(T::KeywordSwitch);
+        self.expect_token(T::LParen)?;
         let expr_node = self.expect_expr()?;
-        self.expect_token(token!(RParen))?;
-        self.expect_token(token!(LBrace))?;
+        self.expect_token(T::RParen)?;
+        self.expect_token(T::LBrace)?;
         let cases = self.parse_switch_prong_list()?;
-        let trailing_comma = self.token_tag(self.tok_i - 1) == token!(Comma);
-        self.expect_token(token!(RBrace))?;
+        let trailing_comma = self.token_tag(self.tok_i - 1) == T::Comma;
+        self.expect_token(T::RBrace)?;
 
         let rhs = self.add_extra(node::SubRange {
             start: cases.start,
@@ -17,8 +17,8 @@ impl Parser<'_, '_> {
         });
         Ok(self.add_node(Node {
             tag: match trailing_comma {
-                true => node!(SwitchComma),
-                false => node!(Switch),
+                true => N::SwitchComma,
+                false => N::Switch,
             },
             main_token: switch_token,
             data: node::Data {
@@ -31,16 +31,16 @@ impl Parser<'_, '_> {
     pub(super) fn parse_switch_prong(&mut self) -> Result<node::Index> {
         let mut items = Vec::new();
 
-        let is_inline = self.eat_token(token!(KeywordInline)).is_some();
+        let is_inline = self.eat_token(T::KeywordInline).is_some();
 
-        if self.eat_token(token!(KeywordElse)).is_none() {
+        if self.eat_token(T::KeywordElse).is_none() {
             loop {
                 let item = self.parse_switch_item()?;
                 if item == 0 {
                     break;
                 }
                 items.push(item);
-                if self.eat_token(token!(Comma)).is_none() {
+                if self.eat_token(T::Comma).is_none() {
                     break;
                 }
             }
@@ -51,7 +51,7 @@ impl Parser<'_, '_> {
                 return Ok(NULL_NODE);
             }
         }
-        let arrow_token = self.expect_token(token!(EqualAngleBracketRight))?;
+        let arrow_token = self.expect_token(T::EqualAngleBracketRight)?;
         self.parse_ptr_index_payload()?;
 
         match items[..] {
@@ -59,8 +59,8 @@ impl Parser<'_, '_> {
                 let rhs = self.expect_single_assign_expr()?;
                 Ok(self.add_node(Node {
                     tag: match is_inline {
-                        true => node!(SwitchCaseInlineOne),
-                        false => node!(SwitchCaseOne),
+                        true => N::SwitchCaseInlineOne,
+                        false => N::SwitchCaseOne,
                     },
                     main_token: arrow_token,
                     data: node::Data { lhs: 0, rhs },
@@ -70,8 +70,8 @@ impl Parser<'_, '_> {
                 let rhs = self.expect_single_assign_expr()?;
                 Ok(self.add_node(Node {
                     tag: match is_inline {
-                        true => node!(SwitchCaseInlineOne),
-                        false => node!(SwitchCaseOne),
+                        true => N::SwitchCaseInlineOne,
+                        false => N::SwitchCaseOne,
                     },
                     main_token: arrow_token,
                     data: node::Data { lhs, rhs },
@@ -83,8 +83,8 @@ impl Parser<'_, '_> {
                 let rhs = self.expect_single_assign_expr()?;
                 Ok(self.add_node(Node {
                     tag: match is_inline {
-                        true => node!(SwitchCaseInline),
-                        false => node!(SwitchCase),
+                        true => N::SwitchCaseInline,
+                        false => N::SwitchCase,
                     },
                     main_token: arrow_token,
                     data: node::Data { lhs, rhs },
@@ -99,10 +99,10 @@ impl Parser<'_, '_> {
             return Ok(NULL_NODE);
         }
 
-        if let Some(token) = self.eat_token(token!(Ellipsis3)) {
+        if let Some(token) = self.eat_token(T::Ellipsis3) {
             let rhs = self.expect_expr()?;
             return Ok(self.add_node(Node {
-                tag: node!(SwitchRange),
+                tag: N::SwitchRange,
                 main_token: token,
                 data: node::Data { lhs: expr, rhs },
             }));
@@ -122,9 +122,9 @@ impl Parser<'_, '_> {
             scratch.push(item);
 
             match self.token_tag(self.tok_i) {
-                token!(Comma) => self.tok_i += 1,
-                token!(Colon) | token!(RParen) | token!(RBrace) | token!(RBracket) => break,
-                _ => self.warn(error!(ExpectedCommaAfterSwitchProng)),
+                T::Comma => self.tok_i += 1,
+                T::Colon | T::RParen | T::RBrace | T::RBracket => break,
+                _ => self.warn(E::ExpectedCommaAfterSwitchProng),
             }
         }
         Ok(self.list_to_span(&scratch))

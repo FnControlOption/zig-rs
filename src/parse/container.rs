@@ -36,16 +36,16 @@ impl Parser<'_, '_> {
 
         let mut last_field = UNDEFINED_TOKEN;
 
-        while self.eat_token(token!(ContainerDocComment)).is_some() {}
+        while self.eat_token(T::ContainerDocComment).is_some() {}
 
         let mut trailing = false;
         loop {
             let doc_comment = self.eat_doc_comments();
 
             match self.token_tag(self.tok_i) {
-                token!(KeywordTest) => {
+                T::KeywordTest => {
                     if let Some(some) = doc_comment {
-                        self.warn_msg(Error::new(error!(TestDocComment), some));
+                        self.warn_msg(Error::new(E::TestDocComment, some));
                     }
                     let test_decl_node = self.expect_test_decl_recoverable();
                     if test_decl_node != 0 {
@@ -56,10 +56,10 @@ impl Parser<'_, '_> {
                     }
                     trailing = false;
                 }
-                token!(KeywordComptime) => match self.token_tag(self.tok_i + 1) {
-                    token!(LBrace) => {
+                T::KeywordComptime => match self.token_tag(self.tok_i + 1) {
+                    T::LBrace => {
                         if let Some(some) = doc_comment {
-                            self.warn_msg(Error::new(error!(ComptimeDocComment), some));
+                            self.warn_msg(Error::new(E::ComptimeDocComment, some));
                         }
                         let comptime_token = self.next_token();
                         let block = self.parse_block().unwrap_or_else(|err| {
@@ -69,7 +69,7 @@ impl Parser<'_, '_> {
                         });
                         if block != 0 {
                             let comptime_node = self.add_node(Node {
-                                tag: node!(Comptime),
+                                tag: N::Comptime,
                                 main_token: comptime_token,
                                 data: node::Data {
                                     lhs: block,
@@ -94,32 +94,32 @@ impl Parser<'_, '_> {
                             FieldState::Err | FieldState::Seen => {}
                             FieldState::End(node) => {
                                 self.warn_msg(Error::new(
-                                    error!(DeclBetweenFields),
+                                    E::DeclBetweenFields,
                                     self.node(node).main_token,
                                 ));
-                                self.warn_msg(Error::note(error!(PreviousField), last_field));
-                                self.warn_msg(Error::note(error!(NextField), identifier));
+                                self.warn_msg(Error::note(E::PreviousField, last_field));
+                                self.warn_msg(Error::note(E::NextField, identifier));
                                 field_state = FieldState::Err;
                             }
                         }
                         items.push(container_field);
                         match self.token_tag(self.tok_i) {
-                            token!(Comma) => {
+                            T::Comma => {
                                 self.tok_i += 1;
                                 trailing = true;
                                 continue;
                             }
-                            token!(RBrace) | token!(Eof) => {
+                            T::RBrace | T::Eof => {
                                 trailing = false;
                                 break;
                             }
                             _ => {}
                         }
-                        self.warn(error!(ExpectedCommaAfterField));
+                        self.warn(E::ExpectedCommaAfterField);
                         self.find_next_container_member();
                     }
                 },
-                token!(KeywordPub) => {
+                T::KeywordPub => {
                     self.tok_i += 1;
                     let top_level_decl = self.expect_top_level_decl_recoverable();
                     if top_level_decl != 0 {
@@ -128,9 +128,9 @@ impl Parser<'_, '_> {
                         }
                         items.push(top_level_decl);
                     }
-                    trailing = self.token_tag(self.tok_i - 1) == token!(Semicolon);
+                    trailing = self.token_tag(self.tok_i - 1) == T::Semicolon;
                 }
-                token!(KeywordUsingnamespace) => {
+                T::KeywordUsingnamespace => {
                     let node = self.expect_using_namespace_recoverable();
                     if node != 0 {
                         if matches!(field_state, FieldState::Seen) {
@@ -138,16 +138,16 @@ impl Parser<'_, '_> {
                         }
                         items.push(node);
                     }
-                    trailing = self.token_tag(self.tok_i - 1) == token!(Semicolon);
+                    trailing = self.token_tag(self.tok_i - 1) == T::Semicolon;
                 }
-                token!(KeywordConst)
-                | token!(KeywordVar)
-                | token!(KeywordThreadlocal)
-                | token!(KeywordExport)
-                | token!(KeywordExtern)
-                | token!(KeywordInline)
-                | token!(KeywordNoinline)
-                | token!(KeywordFn) => {
+                T::KeywordConst
+                | T::KeywordVar
+                | T::KeywordThreadlocal
+                | T::KeywordExport
+                | T::KeywordExtern
+                | T::KeywordInline
+                | T::KeywordNoinline
+                | T::KeywordFn => {
                     let top_level_decl = self.expect_top_level_decl_recoverable();
                     if top_level_decl != 0 {
                         if matches!(field_state, FieldState::Seen) {
@@ -155,11 +155,11 @@ impl Parser<'_, '_> {
                         }
                         items.push(top_level_decl);
                     }
-                    trailing = self.token_tag(self.tok_i - 1) == token!(Semicolon);
+                    trailing = self.token_tag(self.tok_i - 1) == T::Semicolon;
                 }
-                token!(Eof) | token!(RBrace) => {
+                T::Eof | T::RBrace => {
                     if let Some(token) = doc_comment {
-                        self.warn_msg(Error::new(error!(UnattachedDocComment), token));
+                        self.warn_msg(Error::new(E::UnattachedDocComment, token));
                     }
                     break;
                 }
@@ -181,32 +181,32 @@ impl Parser<'_, '_> {
                         FieldState::Err | FieldState::Seen => {}
                         FieldState::End(node) => {
                             self.warn_msg(Error::new(
-                                error!(DeclBetweenFields),
+                                E::DeclBetweenFields,
                                 self.node(node).main_token,
                             ));
-                            self.warn_msg(Error::note(error!(PreviousField), previous_field));
-                            self.warn_msg(Error::note(error!(NextField), identifier));
+                            self.warn_msg(Error::note(E::PreviousField, previous_field));
+                            self.warn_msg(Error::note(E::NextField, identifier));
                             field_state = FieldState::Err;
                         }
                     }
                     items.push(container_field);
                     match self.token_tag(self.tok_i) {
-                        token!(Comma) => {
+                        T::Comma => {
                             self.tok_i += 1;
                             trailing = true;
                             continue;
                         }
-                        token!(RBrace) | token!(Eof) => {
+                        T::RBrace | T::Eof => {
                             trailing = false;
                             break;
                         }
                         _ => {}
                     }
-                    self.warn(error!(ExpectedCommaAfterField));
-                    if self.token_tag(self.tok_i) == token!(Semicolon)
-                        && self.token_tag(identifier) == token!(Identifier)
+                    self.warn(E::ExpectedCommaAfterField);
+                    if self.token_tag(self.tok_i) == T::Semicolon
+                        && self.token_tag(identifier) == T::Identifier
                     {
-                        self.warn_msg(Error::note(error!(VarConstDecl), identifier));
+                        self.warn_msg(Error::note(E::VarConstDecl, identifier));
                     }
                     self.find_next_container_member();
                     continue;
@@ -251,48 +251,48 @@ impl Parser<'_, '_> {
         loop {
             let tok = self.next_token();
             match self.token_tag(tok) {
-                token!(KeywordTest)
-                | token!(KeywordComptime)
-                | token!(KeywordPub)
-                | token!(KeywordExport)
-                | token!(KeywordExtern)
-                | token!(KeywordInline)
-                | token!(KeywordNoinline)
-                | token!(KeywordUsingnamespace)
-                | token!(KeywordThreadlocal)
-                | token!(KeywordConst)
-                | token!(KeywordVar)
-                | token!(KeywordFn) => {
+                T::KeywordTest
+                | T::KeywordComptime
+                | T::KeywordPub
+                | T::KeywordExport
+                | T::KeywordExtern
+                | T::KeywordInline
+                | T::KeywordNoinline
+                | T::KeywordUsingnamespace
+                | T::KeywordThreadlocal
+                | T::KeywordConst
+                | T::KeywordVar
+                | T::KeywordFn => {
                     if level == 0 {
                         self.tok_i -= 1;
                         return;
                     }
                 }
-                token!(Identifier) => {
-                    if self.token_tag(tok + 1) == token!(Comma) && level == 0 {
+                T::Identifier => {
+                    if self.token_tag(tok + 1) == T::Comma && level == 0 {
                         self.tok_i -= 1;
                         return;
                     }
                 }
-                token!(Comma) | token!(Semicolon) => {
+                T::Comma | T::Semicolon => {
                     if level == 0 {
                         return;
                     }
                 }
-                token!(LParen) | token!(LBracket) | token!(LBrace) => level += 1,
-                token!(RParen) | token!(RBracket) => {
+                T::LParen | T::LBracket | T::LBrace => level += 1,
+                T::RParen | T::RBracket => {
                     if level != 0 {
                         level -= 1;
                     }
                 }
-                token!(RBrace) => {
+                T::RBrace => {
                     if level == 0 {
                         self.tok_i -= 1;
                         return;
                     }
                     level -= 1;
                 }
-                token!(Eof) => {
+                T::Eof => {
                     self.tok_i -= 1;
                     return;
                 }
@@ -302,17 +302,17 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn expect_test_decl(&mut self) -> Result<node::Index> {
-        let test_token = self.assert_token(token!(KeywordTest));
+        let test_token = self.assert_token(T::KeywordTest);
         let name_token = match self.token_tag(self.tok_i) {
-            token!(StringLiteral) | token!(Identifier) => Some(self.next_token()),
+            T::StringLiteral | T::Identifier => Some(self.next_token()),
             _ => None,
         };
         let block_node = self.parse_block()?;
         if block_node == 0 {
-            return self.fail(error!(ExpectedBlock));
+            return self.fail(E::ExpectedBlock);
         }
         Ok(self.add_node(Node {
-            tag: node!(TestDecl),
+            tag: N::TestDecl,
             main_token: test_token,
             data: node::Data {
                 lhs: name_token.unwrap_or(0),
@@ -335,29 +335,29 @@ impl Parser<'_, '_> {
         let mut expect_fn = false;
         let mut expect_var_or_fn = false;
         match self.token_tag(extern_export_inline_token) {
-            token!(KeywordExtern) => {
-                self.eat_token(token!(StringLiteral));
+            T::KeywordExtern => {
+                self.eat_token(T::StringLiteral);
                 is_extern = true;
                 expect_var_or_fn = true;
             }
-            token!(KeywordExport) => expect_var_or_fn = true,
-            token!(KeywordInline) | token!(KeywordNoinline) => expect_fn = true,
+            T::KeywordExport => expect_var_or_fn = true,
+            T::KeywordInline | T::KeywordNoinline => expect_fn = true,
             _ => self.tok_i -= 1,
         }
         let fn_proto = self.parse_fn_proto()?;
         if fn_proto != 0 {
             match self.token_tag(self.tok_i) {
-                token!(Semicolon) => {
+                T::Semicolon => {
                     self.tok_i += 1;
                     return Ok(fn_proto);
                 }
-                token!(LBrace) => {
+                T::LBrace => {
                     if is_extern {
-                        self.warn_msg(Error::new(error!(ExternFnBody), extern_export_inline_token));
+                        self.warn_msg(Error::new(E::ExternFnBody, extern_export_inline_token));
                         return Ok(NULL_NODE);
                     }
                     let fn_decl = self.add_node(Node {
-                        tag: node!(FnDecl),
+                        tag: N::FnDecl,
                         main_token: self.node(fn_proto).main_token,
                         data: node::Data {
                             lhs: fn_proto,
@@ -370,29 +370,29 @@ impl Parser<'_, '_> {
                     return Ok(fn_decl);
                 }
                 _ => {
-                    self.warn(error!(ExpectedSemiOrLBrace));
+                    self.warn(E::ExpectedSemiOrLBrace);
                     return Ok(NULL_NODE);
                 }
             }
         }
         if expect_fn {
-            self.warn(error!(ExpectedFn));
+            self.warn(E::ExpectedFn);
             return Err(ParseError);
         }
 
-        let thread_local_token = self.eat_token(token!(KeywordThreadlocal));
+        let thread_local_token = self.eat_token(T::KeywordThreadlocal);
         let var_decl = self.parse_global_var_decl()?;
         if var_decl != 0 {
             return Ok(var_decl);
         }
         if thread_local_token.is_some() {
-            return self.fail(error!(ExpectedVarDecl));
+            return self.fail(E::ExpectedVarDecl);
         }
         if expect_var_or_fn {
-            return self.fail(error!(ExpectedVarDeclOrFn));
+            return self.fail(E::ExpectedVarDeclOrFn);
         }
-        if self.token_tag(self.tok_i) != token!(KeywordUsingnamespace) {
-            return self.fail(error!(ExpectedPubItem));
+        if self.token_tag(self.tok_i) != T::KeywordUsingnamespace {
+            return self.fail(E::ExpectedPubItem);
         }
         return self.expect_using_namespace();
     }
@@ -406,11 +406,11 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn expect_using_namespace(&mut self) -> Result<node::Index> {
-        let usingnamespace_token = self.assert_token(token!(KeywordUsingnamespace));
+        let usingnamespace_token = self.assert_token(T::KeywordUsingnamespace);
         let expr = self.expect_expr()?;
-        self.expect_semicolon(error!(ExpectedSemiAfterDecl), false)?;
+        self.expect_semicolon(E::ExpectedSemiAfterDecl, false)?;
         Ok(self.add_node(Node {
-            tag: node!(Usingnamespace),
+            tag: N::Usingnamespace,
             main_token: usingnamespace_token,
             data: node::Data {
                 lhs: expr,
@@ -429,28 +429,28 @@ impl Parser<'_, '_> {
 
     pub(super) fn expect_container_field(&mut self) -> Result<node::Index> {
         let mut main_token = self.tok_i;
-        self.eat_token(token!(KeywordComptime));
-        let tuple_like = self.token_tag(self.tok_i) != token!(Identifier)
-            || self.token_tag(self.tok_i + 1) != token!(Colon);
+        self.eat_token(T::KeywordComptime);
+        let tuple_like = self.token_tag(self.tok_i) != T::Identifier
+            || self.token_tag(self.tok_i + 1) != T::Colon;
         if !tuple_like {
-            main_token = self.assert_token(token!(Identifier));
+            main_token = self.assert_token(T::Identifier);
         }
 
         let mut align_expr: node::Index = 0;
         let mut type_expr: node::Index = 0;
-        if self.eat_token(token!(Colon)).is_some() || tuple_like {
+        if self.eat_token(T::Colon).is_some() || tuple_like {
             type_expr = self.expect_type_expr()?;
             align_expr = self.parse_byte_align()?;
         }
 
-        let value_expr = match self.eat_token(token!(Equal)) {
+        let value_expr = match self.eat_token(T::Equal) {
             None => 0,
             Some(_) => self.expect_expr()?,
         };
 
         if align_expr == 0 {
             Ok(self.add_node(Node {
-                tag: node!(ContainerFieldInit),
+                tag: N::ContainerFieldInit,
                 main_token,
                 data: node::Data {
                     lhs: type_expr,
@@ -459,7 +459,7 @@ impl Parser<'_, '_> {
             }))
         } else if value_expr == 0 {
             Ok(self.add_node(Node {
-                tag: node!(ContainerFieldAlign),
+                tag: N::ContainerFieldAlign,
                 main_token,
                 data: node::Data {
                     lhs: type_expr,
@@ -472,7 +472,7 @@ impl Parser<'_, '_> {
                 align_expr,
             });
             Ok(self.add_node(Node {
-                tag: node!(ContainerField),
+                tag: N::ContainerField,
                 main_token,
                 data: node::Data {
                     lhs: type_expr,
@@ -485,79 +485,79 @@ impl Parser<'_, '_> {
     pub(super) fn parse_c_style_container(&mut self) -> Result<bool> {
         let main_token = self.tok_i;
         match self.token_tag(self.tok_i) {
-            token!(KeywordEnum) | token!(KeywordUnion) | token!(KeywordStruct) => {}
+            T::KeywordEnum | T::KeywordUnion | T::KeywordStruct => {}
             _ => return Ok(false),
         }
         let identifier = self.tok_i + 1;
-        if self.token_tag(identifier) != token!(Identifier) {
+        if self.token_tag(identifier) != T::Identifier {
             return Ok(false);
         }
         self.tok_i += 2;
 
         self.warn_msg(Error::new(
-            error!(CStyleContainer(self.token_tag(main_token))),
+            E::CStyleContainer(self.token_tag(main_token)),
             identifier,
         ));
 
         self.warn_msg(Error::note(
-            error!(ZigStyleContainer(self.token_tag(main_token))),
+            E::ZigStyleContainer(self.token_tag(main_token)),
             identifier,
         ));
 
-        self.expect_token(token!(LBrace))?;
+        self.expect_token(T::LBrace)?;
         self.parse_container_members();
-        self.expect_token(token!(RBrace))?;
-        self.expect_semicolon(error!(ExpectedSemiAfterDecl), true)?;
+        self.expect_token(T::RBrace)?;
+        self.expect_semicolon(E::ExpectedSemiAfterDecl, true)?;
         Ok(true)
     }
 
     pub(super) fn parse_container_decl_auto(&mut self) -> Result<node::Index> {
         let main_token = self.next_token();
         let arg_expr = match self.token_tag(main_token) {
-            token!(KeywordOpaque) => NULL_NODE,
-            token!(KeywordStruct) | token!(KeywordEnum) => match self.eat_token(token!(LParen)) {
+            T::KeywordOpaque => NULL_NODE,
+            T::KeywordStruct | T::KeywordEnum => match self.eat_token(T::LParen) {
                 Some(_) => {
                     let expr = self.expect_expr()?;
-                    self.expect_token(token!(RParen))?;
+                    self.expect_token(T::RParen)?;
                     expr
                 }
                 None => NULL_NODE,
             },
-            token!(KeywordUnion) => match self.eat_token(token!(LParen)) {
-                Some(_) => match self.eat_token(token!(KeywordEnum)) {
-                    Some(_) => match self.eat_token(token!(LParen)) {
+            T::KeywordUnion => match self.eat_token(T::LParen) {
+                Some(_) => match self.eat_token(T::KeywordEnum) {
+                    Some(_) => match self.eat_token(T::LParen) {
                         Some(_) => {
                             let enum_tag_expr = self.expect_expr()?;
-                            self.expect_token(token!(RParen))?;
-                            self.expect_token(token!(RParen))?;
+                            self.expect_token(T::RParen)?;
+                            self.expect_token(T::RParen)?;
 
-                            self.expect_token(token!(LBrace))?;
+                            self.expect_token(T::LBrace)?;
                             let members = self.parse_container_members();
                             let members_span = members.to_span(self);
-                            self.expect_token(token!(RBrace))?;
+                            self.expect_token(T::RBrace)?;
 
                             let lhs = enum_tag_expr;
                             let rhs = self.add_extra(members_span);
                             return Ok(self.add_node(Node {
                                 tag: match members.trailing {
-                                    true => node!(TaggedUnionEnumTagTrailing),
-                                    false => node!(TaggedUnionEnumTag),
+                                    true => N::TaggedUnionEnumTagTrailing,
+                                    false => N::TaggedUnionEnumTag,
                                 },
                                 main_token,
                                 data: node::Data { lhs, rhs },
                             }));
                         }
                         None => {
-                            self.expect_token(token!(RParen))?;
+                            self.expect_token(T::RParen)?;
 
-                            self.expect_token(token!(LBrace))?;
+                            self.expect_token(T::LBrace)?;
                             let members = self.parse_container_members();
-                            self.expect_token(token!(RBrace))?;
+                            self.expect_token(T::RBrace)?;
                             if members.len <= 2 {
                                 return Ok(self.add_node(Node {
                                     tag: match members.trailing {
-                                        true => node!(TaggedUnionTwoTrailing),
-                                        false => node!(TaggedUnionTwo),
+                                        true => N::TaggedUnionTwoTrailing,
+                                        false => N::TaggedUnionTwo,
                                     },
                                     main_token,
                                     data: node::Data {
@@ -569,8 +569,8 @@ impl Parser<'_, '_> {
                                 let span = members.to_span(self);
                                 return Ok(self.add_node(Node {
                                     tag: match members.trailing {
-                                        true => node!(TaggedUnionTrailing),
-                                        false => node!(TaggedUnion),
+                                        true => N::TaggedUnionTrailing,
+                                        false => N::TaggedUnion,
                                     },
                                     main_token,
                                     data: node::Data {
@@ -583,7 +583,7 @@ impl Parser<'_, '_> {
                     },
                     None => {
                         let expr = self.expect_expr()?;
-                        self.expect_token(token!(RParen))?;
+                        self.expect_token(T::RParen)?;
                         expr
                     }
                 },
@@ -591,19 +591,19 @@ impl Parser<'_, '_> {
             },
             _ => {
                 self.tok_i -= 1;
-                return self.fail(error!(ExpectedContainer));
+                return self.fail(E::ExpectedContainer);
             }
         };
-        self.expect_token(token!(LBrace))?;
+        self.expect_token(T::LBrace)?;
         let members = self.parse_container_members();
-        self.expect_token(token!(RBrace))?;
+        self.expect_token(T::RBrace)?;
 
         if arg_expr == 0 {
             if members.len <= 2 {
                 return Ok(self.add_node(Node {
                     tag: match members.trailing {
-                        true => node!(ContainerDeclTwoTrailing),
-                        false => node!(ContainerDeclTwo),
+                        true => N::ContainerDeclTwoTrailing,
+                        false => N::ContainerDeclTwo,
                     },
                     main_token,
                     data: node::Data {
@@ -615,8 +615,8 @@ impl Parser<'_, '_> {
                 let span = members.to_span(self);
                 return Ok(self.add_node(Node {
                     tag: match members.trailing {
-                        true => node!(ContainerDeclTrailing),
-                        false => node!(ContainerDecl),
+                        true => N::ContainerDeclTrailing,
+                        false => N::ContainerDecl,
                     },
                     main_token,
                     data: node::Data {
@@ -630,8 +630,8 @@ impl Parser<'_, '_> {
             let rhs = self.add_extra(span);
             return Ok(self.add_node(Node {
                 tag: match members.trailing {
-                    true => node!(ContainerDeclArgTrailing),
-                    false => node!(ContainerDeclArg),
+                    true => N::ContainerDeclArgTrailing,
+                    false => N::ContainerDeclArg,
                 },
                 main_token,
                 data: node::Data { lhs: arg_expr, rhs },

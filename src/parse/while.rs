@@ -2,12 +2,12 @@ use super::*;
 
 impl Parser<'_, '_> {
     pub(super) fn parse_while_statement(&mut self) -> Result<node::Index> {
-        let Some(while_token) = self.eat_token(token!(KeywordWhile)) else {
+        let Some(while_token) = self.eat_token(T::KeywordWhile) else {
             return Ok(NULL_NODE);
         };
-        self.expect_token(token!(LParen))?;
+        self.expect_token(T::LParen)?;
         let condition = self.expect_expr()?;
-        self.expect_token(token!(RParen))?;
+        self.expect_token(T::RParen)?;
         self.parse_ptr_payload()?;
         let cont_expr = self.parse_while_continue_expr()?;
 
@@ -19,12 +19,12 @@ impl Parser<'_, '_> {
             }
             let assign_expr = self.parse_assign_expr()?;
             if assign_expr == 0 {
-                return self.fail(error!(ExpectedBlockOrAssignment));
+                return self.fail(E::ExpectedBlockOrAssignment);
             }
-            if self.eat_token(token!(Semicolon)).is_some() {
+            if self.eat_token(T::Semicolon).is_some() {
                 if cont_expr == 0 {
                     return Ok(self.add_node(Node {
-                        tag: node!(WhileSimple),
+                        tag: N::WhileSimple,
                         main_token: while_token,
                         data: node::Data {
                             lhs: condition,
@@ -38,7 +38,7 @@ impl Parser<'_, '_> {
                         then_expr: assign_expr,
                     });
                     return Ok(self.add_node(Node {
-                        tag: node!(WhileCont),
+                        tag: N::WhileCont,
                         main_token: while_token,
                         data: node::Data { lhs, rhs },
                     }));
@@ -47,13 +47,13 @@ impl Parser<'_, '_> {
             else_required = true;
             assign_expr
         };
-        if self.eat_token(token!(KeywordElse)).is_none() {
+        if self.eat_token(T::KeywordElse).is_none() {
             if else_required {
-                self.warn(error!(ExpectedSemiOrElse));
+                self.warn(E::ExpectedSemiOrElse);
             }
             if cont_expr == 0 {
                 return Ok(self.add_node(Node {
-                    tag: node!(WhileSimple),
+                    tag: N::WhileSimple,
                     main_token: while_token,
                     data: node::Data {
                         lhs: condition,
@@ -67,7 +67,7 @@ impl Parser<'_, '_> {
                     then_expr,
                 });
                 return Ok(self.add_node(Node {
-                    tag: node!(WhileCont),
+                    tag: N::WhileCont,
                     main_token: while_token,
                     data: node::Data { lhs, rhs },
                 }));
@@ -81,7 +81,7 @@ impl Parser<'_, '_> {
             else_expr,
         });
         Ok(self.add_node(Node {
-            tag: node!(While),
+            tag: N::While,
             main_token: while_token,
             data: node::Data {
                 lhs: condition,
@@ -91,20 +91,20 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn parse_while_expr(&mut self) -> Result<node::Index> {
-        let Some(while_token) = self.eat_token(token!(KeywordWhile)) else {
+        let Some(while_token) = self.eat_token(T::KeywordWhile) else {
             return Ok(NULL_NODE);
         };
-        self.expect_token(token!(LParen))?;
+        self.expect_token(T::LParen)?;
         let condition = self.expect_expr()?;
-        self.expect_token(token!(RParen))?;
+        self.expect_token(T::RParen)?;
         self.parse_ptr_payload()?;
         let cont_expr = self.parse_while_continue_expr()?;
 
         let then_expr = self.expect_expr()?;
-        if self.eat_token(token!(KeywordElse)).is_none() {
+        if self.eat_token(T::KeywordElse).is_none() {
             if cont_expr == 0 {
                 return Ok(self.add_node(Node {
-                    tag: node!(WhileSimple),
+                    tag: N::WhileSimple,
                     main_token: while_token,
                     data: node::Data {
                         lhs: condition,
@@ -117,7 +117,7 @@ impl Parser<'_, '_> {
                     then_expr,
                 });
                 return Ok(self.add_node(Node {
-                    tag: node!(WhileCont),
+                    tag: N::WhileCont,
                     main_token: while_token,
                     data: node::Data {
                         lhs: condition,
@@ -134,7 +134,7 @@ impl Parser<'_, '_> {
             else_expr,
         });
         Ok(self.add_node(Node {
-            tag: node!(While),
+            tag: N::While,
             main_token: while_token,
             data: node::Data {
                 lhs: condition,
@@ -144,20 +144,20 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn parse_while_type_expr(&mut self) -> Result<node::Index> {
-        let Some(while_token) = self.eat_token(token!(KeywordWhile)) else {
+        let Some(while_token) = self.eat_token(T::KeywordWhile) else {
             return Ok(NULL_NODE);
         };
-        self.expect_token(token!(LParen))?;
+        self.expect_token(T::LParen)?;
         let condition = self.expect_expr()?;
-        self.expect_token(token!(RParen))?;
+        self.expect_token(T::RParen)?;
         self.parse_ptr_payload()?;
         let cont_expr = self.parse_while_continue_expr()?;
 
         let then_expr = self.expect_type_expr()?;
-        if self.eat_token(token!(KeywordElse)).is_none() {
+        if self.eat_token(T::KeywordElse).is_none() {
             if cont_expr == 0 {
                 return Ok(self.add_node(Node {
-                    tag: node!(WhileSimple),
+                    tag: N::WhileSimple,
                     main_token: while_token,
                     data: node::Data {
                         lhs: condition,
@@ -170,7 +170,7 @@ impl Parser<'_, '_> {
                     then_expr,
                 });
                 return Ok(self.add_node(Node {
-                    tag: node!(WhileCont),
+                    tag: N::WhileCont,
                     main_token: while_token,
                     data: node::Data {
                         lhs: condition,
@@ -187,7 +187,7 @@ impl Parser<'_, '_> {
             else_expr,
         });
         Ok(self.add_node(Node {
-            tag: node!(While),
+            tag: N::While,
             main_token: while_token,
             data: node::Data {
                 lhs: condition,
@@ -197,20 +197,20 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn parse_while_continue_expr(&mut self) -> Result<node::Index> {
-        if self.eat_token(token!(Colon)).is_none() {
-            if self.token_tag(self.tok_i) == token!(LParen)
+        if self.eat_token(T::Colon).is_none() {
+            if self.token_tag(self.tok_i) == T::LParen
                 && self.tokens_on_same_line(self.tok_i - 1, self.tok_i)
             {
-                return self.fail(error!(ExpectedContinueExpr));
+                return self.fail(E::ExpectedContinueExpr);
             }
             return Ok(NULL_NODE);
         }
-        self.expect_token(token!(LParen))?;
+        self.expect_token(T::LParen)?;
         let node = self.parse_assign_expr()?;
         if node == 0 {
-            return self.fail(error!(ExpectedExprOrAssignment));
+            return self.fail(E::ExpectedExprOrAssignment);
         }
-        self.expect_token(token!(RParen))?;
+        self.expect_token(T::RParen)?;
         Ok(node)
     }
 }

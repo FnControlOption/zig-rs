@@ -9,7 +9,7 @@ const DUMP_TREE: bool = false;
 macro_rules! assert_node {
     ($tree:ident, $index:expr, $tag:ident) => {{
         let node = $tree.node($index);
-        assert_eq!(node.tag, node!($tag));
+        assert_eq!(node.tag, N::$tag);
         node
     }};
 
@@ -23,20 +23,20 @@ macro_rules! assert_node {
 
 macro_rules! assert_token {
     ($tree:ident, $index:expr, $tag:ident, $needle:expr) => {{
-        assert_eq!($tree.token_tag($index), token!($tag));
+        assert_eq!($tree.token_tag($index), T::$tag);
         let start = $tree.token_start($index);
         assert!($tree.source(start).starts_with($needle.as_bytes()));
     }};
     ($tree:ident, $index:expr, $tag:ident) => {{
-        assert!(token!($tag).lexeme().is_some());
-        assert_token!($tree, $index, $tag, token!($tag).symbol());
+        assert!(T::$tag.lexeme().is_some());
+        assert_token!($tree, $index, $tag, T::$tag.symbol());
     }};
 }
 
 macro_rules! assert_error {
     ($tree:ident, $index:expr, $tag:ident, is_note: $is_note:expr) => {{
         let error = &$tree.errors[$index];
-        assert_eq!(error.tag, error!($tag));
+        assert_eq!(error.tag, E::$tag);
         assert_eq!(error.is_note, $is_note);
         error
     }};
@@ -45,7 +45,7 @@ macro_rules! assert_error {
     };
     ($tree:ident, $index:expr, $tag:ident(_), is_note: $is_note:expr) => {{
         let error = &$tree.errors[$index];
-        assert!(matches!(error.tag, error!($tag(_))));
+        assert!(matches!(error.tag, E::$tag(_)));
         assert_eq!(error.is_note, $is_note);
         error
     }};

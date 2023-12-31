@@ -1,7 +1,10 @@
-use crate::macros::*;
 use crate::parse::Parser;
 use crate::token;
 use crate::Tokenizer;
+
+use crate::ast::error::Tag as E;
+use crate::ast::node::Tag as N;
+use crate::token::Tag as T;
 
 pub mod visitor;
 pub use visitor::Visitor;
@@ -213,153 +216,149 @@ impl Ast<'_> {
         loop {
             let n = self.node(index);
             index = match n.tag {
-                node!(Root) => return 0,
+                N::Root => return 0,
 
-                node!(TestDecl)
-                | node!(Errdefer)
-                | node!(Defer)
-                | node!(BoolNot)
-                | node!(Negation)
-                | node!(BitNot)
-                | node!(NegationWrap)
-                | node!(AddressOf)
-                | node!(Try)
-                | node!(Await)
-                | node!(OptionalType)
-                | node!(Switch)
-                | node!(SwitchComma)
-                | node!(IfSimple)
-                | node!(If)
-                | node!(Suspend)
-                | node!(Resume)
-                | node!(Continue)
-                | node!(Break)
-                | node!(Return)
-                | node!(AnyframeType)
-                | node!(Identifier)
-                | node!(AnyframeLiteral)
-                | node!(CharLiteral)
-                | node!(NumberLiteral)
-                | node!(UnreachableLiteral)
-                | node!(StringLiteral)
-                | node!(MultilineStringLiteral)
-                | node!(GroupedExpression)
-                | node!(BuiltinCallTwo)
-                | node!(BuiltinCallTwoComma)
-                | node!(BuiltinCall)
-                | node!(BuiltinCallComma)
-                | node!(ErrorSetDecl)
-                | node!(Comptime)
-                | node!(Nosuspend)
-                | node!(AsmSimple)
-                | node!(Asm)
-                | node!(ArrayType)
-                | node!(ArrayTypeSentinel)
-                | node!(ErrorValue) => return n.main_token - end_offset,
+                N::TestDecl
+                | N::Errdefer
+                | N::Defer
+                | N::BoolNot
+                | N::Negation
+                | N::BitNot
+                | N::NegationWrap
+                | N::AddressOf
+                | N::Try
+                | N::Await
+                | N::OptionalType
+                | N::Switch
+                | N::SwitchComma
+                | N::IfSimple
+                | N::If
+                | N::Suspend
+                | N::Resume
+                | N::Continue
+                | N::Break
+                | N::Return
+                | N::AnyframeType
+                | N::Identifier
+                | N::AnyframeLiteral
+                | N::CharLiteral
+                | N::NumberLiteral
+                | N::UnreachableLiteral
+                | N::StringLiteral
+                | N::MultilineStringLiteral
+                | N::GroupedExpression
+                | N::BuiltinCallTwo
+                | N::BuiltinCallTwoComma
+                | N::BuiltinCall
+                | N::BuiltinCallComma
+                | N::ErrorSetDecl
+                | N::Comptime
+                | N::Nosuspend
+                | N::AsmSimple
+                | N::Asm
+                | N::ArrayType
+                | N::ArrayTypeSentinel
+                | N::ErrorValue => return n.main_token - end_offset,
 
-                node!(ArrayInitDot)
-                | node!(ArrayInitDotComma)
-                | node!(ArrayInitDotTwo)
-                | node!(ArrayInitDotTwoComma)
-                | node!(StructInitDot)
-                | node!(StructInitDotComma)
-                | node!(StructInitDotTwo)
-                | node!(StructInitDotTwoComma)
-                | node!(EnumLiteral) => return n.main_token - 1 - end_offset,
+                N::ArrayInitDot
+                | N::ArrayInitDotComma
+                | N::ArrayInitDotTwo
+                | N::ArrayInitDotTwoComma
+                | N::StructInitDot
+                | N::StructInitDotComma
+                | N::StructInitDotTwo
+                | N::StructInitDotTwoComma
+                | N::EnumLiteral => return n.main_token - 1 - end_offset,
 
-                node!(Catch)
-                | node!(FieldAccess)
-                | node!(UnwrapOptional)
-                | node!(EqualEqual)
-                | node!(BangEqual)
-                | node!(LessThan)
-                | node!(GreaterThan)
-                | node!(LessOrEqual)
-                | node!(GreaterOrEqual)
-                | node!(AssignMul)
-                | node!(AssignDiv)
-                | node!(AssignMod)
-                | node!(AssignAdd)
-                | node!(AssignSub)
-                | node!(AssignShl)
-                | node!(AssignShlSat)
-                | node!(AssignShr)
-                | node!(AssignBitAnd)
-                | node!(AssignBitXor)
-                | node!(AssignBitOr)
-                | node!(AssignMulWrap)
-                | node!(AssignAddWrap)
-                | node!(AssignSubWrap)
-                | node!(AssignMulSat)
-                | node!(AssignAddSat)
-                | node!(AssignSubSat)
-                | node!(Assign)
-                | node!(MergeErrorSets)
-                | node!(Mul)
-                | node!(Div)
-                | node!(Mod)
-                | node!(ArrayMult)
-                | node!(MulWrap)
-                | node!(MulSat)
-                | node!(Add)
-                | node!(Sub)
-                | node!(ArrayCat)
-                | node!(AddWrap)
-                | node!(SubWrap)
-                | node!(AddSat)
-                | node!(SubSat)
-                | node!(Shl)
-                | node!(ShlSat)
-                | node!(Shr)
-                | node!(BitAnd)
-                | node!(BitXor)
-                | node!(BitOr)
-                | node!(Orelse)
-                | node!(BoolAnd)
-                | node!(BoolOr)
-                | node!(SliceOpen)
-                | node!(Slice)
-                | node!(SliceSentinel)
-                | node!(Deref)
-                | node!(ArrayAccess)
-                | node!(ArrayInitOne)
-                | node!(ArrayInitOneComma)
-                | node!(ArrayInit)
-                | node!(ArrayInitComma)
-                | node!(StructInitOne)
-                | node!(StructInitOneComma)
-                | node!(StructInit)
-                | node!(StructInitComma)
-                | node!(CallOne)
-                | node!(CallOneComma)
-                | node!(Call)
-                | node!(CallComma)
-                | node!(SwitchRange)
-                | node!(ForRange)
-                | node!(ErrorUnion) => n.data.lhs,
+                N::Catch
+                | N::FieldAccess
+                | N::UnwrapOptional
+                | N::EqualEqual
+                | N::BangEqual
+                | N::LessThan
+                | N::GreaterThan
+                | N::LessOrEqual
+                | N::GreaterOrEqual
+                | N::AssignMul
+                | N::AssignDiv
+                | N::AssignMod
+                | N::AssignAdd
+                | N::AssignSub
+                | N::AssignShl
+                | N::AssignShlSat
+                | N::AssignShr
+                | N::AssignBitAnd
+                | N::AssignBitXor
+                | N::AssignBitOr
+                | N::AssignMulWrap
+                | N::AssignAddWrap
+                | N::AssignSubWrap
+                | N::AssignMulSat
+                | N::AssignAddSat
+                | N::AssignSubSat
+                | N::Assign
+                | N::MergeErrorSets
+                | N::Mul
+                | N::Div
+                | N::Mod
+                | N::ArrayMult
+                | N::MulWrap
+                | N::MulSat
+                | N::Add
+                | N::Sub
+                | N::ArrayCat
+                | N::AddWrap
+                | N::SubWrap
+                | N::AddSat
+                | N::SubSat
+                | N::Shl
+                | N::ShlSat
+                | N::Shr
+                | N::BitAnd
+                | N::BitXor
+                | N::BitOr
+                | N::Orelse
+                | N::BoolAnd
+                | N::BoolOr
+                | N::SliceOpen
+                | N::Slice
+                | N::SliceSentinel
+                | N::Deref
+                | N::ArrayAccess
+                | N::ArrayInitOne
+                | N::ArrayInitOneComma
+                | N::ArrayInit
+                | N::ArrayInitComma
+                | N::StructInitOne
+                | N::StructInitOneComma
+                | N::StructInit
+                | N::StructInitComma
+                | N::CallOne
+                | N::CallOneComma
+                | N::Call
+                | N::CallComma
+                | N::SwitchRange
+                | N::ForRange
+                | N::ErrorUnion => n.data.lhs,
 
-                node!(AssignDestructure) => {
+                N::AssignDestructure => {
                     let extra_idx = n.data.lhs;
                     let lhs_len: u32 = self.extra_data(extra_idx);
                     assert!(lhs_len > 0);
                     self.extra_data(extra_idx + 1)
                 }
 
-                node!(FnDecl)
-                | node!(FnProtoSimple)
-                | node!(FnProtoMulti)
-                | node!(FnProtoOne)
-                | node!(FnProto) => {
+                N::FnDecl | N::FnProtoSimple | N::FnProtoMulti | N::FnProtoOne | N::FnProto => {
                     let mut i = n.main_token;
                     while i > 0 {
                         i -= 1;
                         match self.token_tag(i) {
-                            token!(KeywordExtern)
-                            | token!(KeywordExport)
-                            | token!(KeywordPub)
-                            | token!(KeywordInline)
-                            | token!(KeywordNoinline)
-                            | token!(StringLiteral) => continue,
+                            T::KeywordExtern
+                            | T::KeywordExport
+                            | T::KeywordPub
+                            | T::KeywordInline
+                            | T::KeywordNoinline
+                            | T::StringLiteral => continue,
 
                             _ => return i + 1 - end_offset,
                         }
@@ -367,46 +366,40 @@ impl Ast<'_> {
                     return i - end_offset;
                 }
 
-                node!(Usingnamespace) => {
-                    if n.main_token > 0 && self.token_tag(n.main_token - 1) == token!(KeywordPub) {
+                N::Usingnamespace => {
+                    if n.main_token > 0 && self.token_tag(n.main_token - 1) == T::KeywordPub {
                         end_offset += 1;
                     }
                     return n.main_token - end_offset;
                 }
 
-                node!(AsyncCallOne)
-                | node!(AsyncCallOneComma)
-                | node!(AsyncCall)
-                | node!(AsyncCallComma) => {
+                N::AsyncCallOne | N::AsyncCallOneComma | N::AsyncCall | N::AsyncCallComma => {
                     end_offset += 1;
                     n.data.lhs
                 }
 
-                node!(ContainerFieldInit) | node!(ContainerFieldAlign) | node!(ContainerField) => {
+                N::ContainerFieldInit | N::ContainerFieldAlign | N::ContainerField => {
                     let name_token = n.main_token;
-                    if self.token_tag(name_token) != token!(KeywordComptime)
+                    if self.token_tag(name_token) != T::KeywordComptime
                         && name_token > 0
-                        && self.token_tag(name_token - 1) == token!(KeywordComptime)
+                        && self.token_tag(name_token - 1) == T::KeywordComptime
                     {
                         end_offset += 1;
                     }
                     return name_token - end_offset;
                 }
 
-                node!(GlobalVarDecl)
-                | node!(LocalVarDecl)
-                | node!(SimpleVarDecl)
-                | node!(AlignedVarDecl) => {
+                N::GlobalVarDecl | N::LocalVarDecl | N::SimpleVarDecl | N::AlignedVarDecl => {
                     let mut i = n.main_token;
                     while i > 0 {
                         i -= 1;
                         match self.token_tag(i) {
-                            token!(KeywordExtern)
-                            | token!(KeywordExport)
-                            | token!(KeywordComptime)
-                            | token!(KeywordPub)
-                            | token!(KeywordThreadlocal)
-                            | token!(StringLiteral) => continue,
+                            T::KeywordExtern
+                            | T::KeywordExport
+                            | T::KeywordComptime
+                            | T::KeywordPub
+                            | T::KeywordThreadlocal
+                            | T::StringLiteral => continue,
 
                             _ => return i + 1 - end_offset,
                         }
@@ -414,94 +407,84 @@ impl Ast<'_> {
                     return i - end_offset;
                 }
 
-                node!(Block)
-                | node!(BlockSemicolon)
-                | node!(BlockTwo)
-                | node!(BlockTwoSemicolon) => {
+                N::Block | N::BlockSemicolon | N::BlockTwo | N::BlockTwoSemicolon => {
                     let lbrace = n.main_token;
-                    if self.token_tag(lbrace - 1) == token!(Colon)
-                        && self.token_tag(lbrace - 2) == token!(Identifier)
+                    if self.token_tag(lbrace - 1) == T::Colon
+                        && self.token_tag(lbrace - 2) == T::Identifier
                     {
                         end_offset += 2;
                     }
                     return lbrace - end_offset;
                 }
 
-                node!(ContainerDecl)
-                | node!(ContainerDeclTrailing)
-                | node!(ContainerDeclTwo)
-                | node!(ContainerDeclTwoTrailing)
-                | node!(ContainerDeclArg)
-                | node!(ContainerDeclArgTrailing)
-                | node!(TaggedUnion)
-                | node!(TaggedUnionTrailing)
-                | node!(TaggedUnionTwo)
-                | node!(TaggedUnionTwoTrailing)
-                | node!(TaggedUnionEnumTag)
-                | node!(TaggedUnionEnumTagTrailing) => {
+                N::ContainerDecl
+                | N::ContainerDeclTrailing
+                | N::ContainerDeclTwo
+                | N::ContainerDeclTwoTrailing
+                | N::ContainerDeclArg
+                | N::ContainerDeclArgTrailing
+                | N::TaggedUnion
+                | N::TaggedUnionTrailing
+                | N::TaggedUnionTwo
+                | N::TaggedUnionTwoTrailing
+                | N::TaggedUnionEnumTag
+                | N::TaggedUnionEnumTagTrailing => {
                     match self.token_tag(n.main_token.saturating_sub(1)) {
-                        token!(KeywordPacked) | token!(KeywordExtern) => end_offset += 1,
+                        T::KeywordPacked | T::KeywordExtern => end_offset += 1,
                         _ => {}
                     }
                     return n.main_token - end_offset;
                 }
 
-                node!(PtrTypeAligned)
-                | node!(PtrTypeSentinel)
-                | node!(PtrType)
-                | node!(PtrTypeBitRange) => {
+                N::PtrTypeAligned | N::PtrTypeSentinel | N::PtrType | N::PtrTypeBitRange => {
                     return (match self.token_tag(n.main_token) {
-                        token!(Asterisk) | token!(AsteriskAsterisk) => {
+                        T::Asterisk | T::AsteriskAsterisk => {
                             match self.token_tag(n.main_token.saturating_sub(1)) {
-                                token!(LBracket) => n.main_token.saturating_sub(1),
+                                T::LBracket => n.main_token.saturating_sub(1),
                                 _ => n.main_token,
                             }
                         }
-                        token!(LBracket) => n.main_token,
+                        T::LBracket => n.main_token,
                         _ => unreachable!(),
                     }) - end_offset
                 }
 
-                node!(SwitchCaseOne) => {
+                N::SwitchCaseOne => {
                     if n.data.lhs == 0 {
                         return n.main_token - 1 - end_offset;
                     } else {
                         n.data.lhs
                     }
                 }
-                node!(SwitchCaseInlineOne) => {
+                N::SwitchCaseInlineOne => {
                     if n.data.lhs == 0 {
                         return n.main_token - 2 - end_offset;
                     } else {
                         return self.first_token(n.data.lhs) - 1;
                     }
                 }
-                node!(SwitchCase) => {
+                N::SwitchCase => {
                     let extra: node::SubRange = self.extra_data(n.data.lhs);
                     assert!(extra.end - extra.start > 0);
                     self.extra_data(extra.start)
                 }
-                node!(SwitchCaseInline) => {
+                N::SwitchCaseInline => {
                     let extra: node::SubRange = self.extra_data(n.data.lhs);
                     assert!(extra.end - extra.start > 0);
                     return self.first_token(self.extra_data(extra.start)) - 1;
                 }
 
-                node!(AsmOutput) | node!(AsmInput) => {
-                    assert_eq!(self.token_tag(n.main_token - 1), token!(LBracket));
+                N::AsmOutput | N::AsmInput => {
+                    assert_eq!(self.token_tag(n.main_token - 1), T::LBracket);
                     return n.main_token - 1 - end_offset;
                 }
 
-                node!(WhileSimple)
-                | node!(WhileCont)
-                | node!(While)
-                | node!(ForSimple)
-                | node!(For) => {
+                N::WhileSimple | N::WhileCont | N::While | N::ForSimple | N::For => {
                     let mut result = n.main_token;
-                    if self.token_tag(result.saturating_sub(1)) == token!(KeywordInline) {
+                    if self.token_tag(result.saturating_sub(1)) == T::KeywordInline {
                         result -= 1;
                     }
-                    if self.token_tag(result.saturating_sub(1)) == token!(Colon) {
+                    if self.token_tag(result.saturating_sub(1)) == T::Colon {
                         result = result.saturating_sub(2);
                     }
                     return result - end_offset;
@@ -515,92 +498,92 @@ impl Ast<'_> {
         loop {
             let n = self.node(index);
             index = match n.tag {
-                node!(Root) => return self.token_starts.len() as TokenIndex,
+                N::Root => return self.token_starts.len() as TokenIndex,
 
-                node!(Usingnamespace)
-                | node!(BoolNot)
-                | node!(Negation)
-                | node!(BitNot)
-                | node!(NegationWrap)
-                | node!(AddressOf)
-                | node!(Try)
-                | node!(Await)
-                | node!(OptionalType)
-                | node!(Resume)
-                | node!(Nosuspend)
-                | node!(Comptime) => n.data.lhs,
+                N::Usingnamespace
+                | N::BoolNot
+                | N::Negation
+                | N::BitNot
+                | N::NegationWrap
+                | N::AddressOf
+                | N::Try
+                | N::Await
+                | N::OptionalType
+                | N::Resume
+                | N::Nosuspend
+                | N::Comptime => n.data.lhs,
 
-                node!(TestDecl)
-                | node!(Errdefer)
-                | node!(Defer)
-                | node!(Catch)
-                | node!(EqualEqual)
-                | node!(BangEqual)
-                | node!(LessThan)
-                | node!(GreaterThan)
-                | node!(LessOrEqual)
-                | node!(GreaterOrEqual)
-                | node!(AssignMul)
-                | node!(AssignDiv)
-                | node!(AssignMod)
-                | node!(AssignAdd)
-                | node!(AssignSub)
-                | node!(AssignShl)
-                | node!(AssignShlSat)
-                | node!(AssignShr)
-                | node!(AssignBitAnd)
-                | node!(AssignBitXor)
-                | node!(AssignBitOr)
-                | node!(AssignMulWrap)
-                | node!(AssignAddWrap)
-                | node!(AssignSubWrap)
-                | node!(AssignMulSat)
-                | node!(AssignAddSat)
-                | node!(AssignSubSat)
-                | node!(Assign)
-                | node!(AssignDestructure)
-                | node!(MergeErrorSets)
-                | node!(Mul)
-                | node!(Div)
-                | node!(Mod)
-                | node!(ArrayMult)
-                | node!(MulWrap)
-                | node!(MulSat)
-                | node!(Add)
-                | node!(Sub)
-                | node!(ArrayCat)
-                | node!(AddWrap)
-                | node!(SubWrap)
-                | node!(AddSat)
-                | node!(SubSat)
-                | node!(Shl)
-                | node!(ShlSat)
-                | node!(Shr)
-                | node!(BitAnd)
-                | node!(BitXor)
-                | node!(BitOr)
-                | node!(Orelse)
-                | node!(BoolAnd)
-                | node!(BoolOr)
-                | node!(AnyframeType)
-                | node!(ErrorUnion)
-                | node!(IfSimple)
-                | node!(WhileSimple)
-                | node!(ForSimple)
-                | node!(FnProtoSimple)
-                | node!(FnProtoMulti)
-                | node!(PtrTypeAligned)
-                | node!(PtrTypeSentinel)
-                | node!(PtrType)
-                | node!(PtrTypeBitRange)
-                | node!(ArrayType)
-                | node!(SwitchCaseOne)
-                | node!(SwitchCaseInlineOne)
-                | node!(SwitchCase)
-                | node!(SwitchCaseInline)
-                | node!(SwitchRange) => n.data.rhs,
+                N::TestDecl
+                | N::Errdefer
+                | N::Defer
+                | N::Catch
+                | N::EqualEqual
+                | N::BangEqual
+                | N::LessThan
+                | N::GreaterThan
+                | N::LessOrEqual
+                | N::GreaterOrEqual
+                | N::AssignMul
+                | N::AssignDiv
+                | N::AssignMod
+                | N::AssignAdd
+                | N::AssignSub
+                | N::AssignShl
+                | N::AssignShlSat
+                | N::AssignShr
+                | N::AssignBitAnd
+                | N::AssignBitXor
+                | N::AssignBitOr
+                | N::AssignMulWrap
+                | N::AssignAddWrap
+                | N::AssignSubWrap
+                | N::AssignMulSat
+                | N::AssignAddSat
+                | N::AssignSubSat
+                | N::Assign
+                | N::AssignDestructure
+                | N::MergeErrorSets
+                | N::Mul
+                | N::Div
+                | N::Mod
+                | N::ArrayMult
+                | N::MulWrap
+                | N::MulSat
+                | N::Add
+                | N::Sub
+                | N::ArrayCat
+                | N::AddWrap
+                | N::SubWrap
+                | N::AddSat
+                | N::SubSat
+                | N::Shl
+                | N::ShlSat
+                | N::Shr
+                | N::BitAnd
+                | N::BitXor
+                | N::BitOr
+                | N::Orelse
+                | N::BoolAnd
+                | N::BoolOr
+                | N::AnyframeType
+                | N::ErrorUnion
+                | N::IfSimple
+                | N::WhileSimple
+                | N::ForSimple
+                | N::FnProtoSimple
+                | N::FnProtoMulti
+                | N::PtrTypeAligned
+                | N::PtrTypeSentinel
+                | N::PtrType
+                | N::PtrTypeBitRange
+                | N::ArrayType
+                | N::SwitchCaseOne
+                | N::SwitchCaseInlineOne
+                | N::SwitchCase
+                | N::SwitchCaseInline
+                | N::SwitchRange => n.data.rhs,
 
-                node!(ForRange) => {
+                N::ForRange => {
                     if n.data.rhs != 0 {
                         n.data.rhs
                     } else {
@@ -608,26 +591,26 @@ impl Ast<'_> {
                     }
                 }
 
-                node!(FieldAccess)
-                | node!(UnwrapOptional)
-                | node!(GroupedExpression)
-                | node!(MultilineStringLiteral)
-                | node!(ErrorSetDecl)
-                | node!(AsmSimple)
-                | node!(AsmOutput)
-                | node!(AsmInput)
-                | node!(ErrorValue) => return n.data.rhs + end_offset,
+                N::FieldAccess
+                | N::UnwrapOptional
+                | N::GroupedExpression
+                | N::MultilineStringLiteral
+                | N::ErrorSetDecl
+                | N::AsmSimple
+                | N::AsmOutput
+                | N::AsmInput
+                | N::ErrorValue => return n.data.rhs + end_offset,
 
-                node!(AnyframeLiteral)
-                | node!(CharLiteral)
-                | node!(NumberLiteral)
-                | node!(UnreachableLiteral)
-                | node!(Identifier)
-                | node!(Deref)
-                | node!(EnumLiteral)
-                | node!(StringLiteral) => return n.main_token + end_offset,
+                N::AnyframeLiteral
+                | N::CharLiteral
+                | N::NumberLiteral
+                | N::UnreachableLiteral
+                | N::Identifier
+                | N::Deref
+                | N::EnumLiteral
+                | N::StringLiteral => return n.main_token + end_offset,
 
-                node!(Return) => {
+                N::Return => {
                     if n.data.lhs != 0 {
                         n.data.lhs
                     } else {
@@ -635,7 +618,7 @@ impl Ast<'_> {
                     }
                 }
 
-                node!(Call) | node!(AsyncCall) => {
+                N::Call | N::AsyncCall => {
                     end_offset += 1;
                     let params: node::SubRange = self.extra_data(n.data.rhs);
                     if params.end - params.start == 0 {
@@ -643,7 +626,7 @@ impl Ast<'_> {
                     }
                     self.extra_data(params.end - 1)
                 }
-                node!(TaggedUnionEnumTag) => {
+                N::TaggedUnionEnumTag => {
                     let members: node::SubRange = self.extra_data(n.data.rhs);
                     if members.end - members.start == 0 {
                         end_offset += 4;
@@ -653,13 +636,13 @@ impl Ast<'_> {
                         self.extra_data(members.end - 1)
                     }
                 }
-                node!(CallComma) | node!(AsyncCallComma) | node!(TaggedUnionEnumTagTrailing) => {
+                N::CallComma | N::AsyncCallComma | N::TaggedUnionEnumTagTrailing => {
                     end_offset += 2;
                     let params: node::SubRange = self.extra_data(n.data.rhs);
                     assert!(params.end > params.start);
                     self.extra_data(params.end - 1)
                 }
-                node!(Switch) => {
+                N::Switch => {
                     let cases: node::SubRange = self.extra_data(n.data.rhs);
                     if cases.end - cases.start == 0 {
                         end_offset += 3;
@@ -669,7 +652,7 @@ impl Ast<'_> {
                         self.extra_data(cases.end - 1)
                     }
                 }
-                node!(ContainerDeclArg) => {
+                N::ContainerDeclArg => {
                     let members: node::SubRange = self.extra_data(n.data.rhs);
                     if members.end - members.start == 0 {
                         end_offset += 3;

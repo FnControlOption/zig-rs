@@ -11,5 +11,4 @@ pub use token::{Token, Tokenizer};
 pub mod ast;
 pub use ast::Ast;
 
-mod macros;
 mod parse;

@@ -2,10 +2,10 @@ use super::*;
 
 impl Parser<'_, '_> {
     pub(super) fn expect_if_statement(&mut self) -> Result<node::Index> {
-        let if_token = self.assert_token(token!(KeywordIf));
-        self.expect_token(token!(LParen))?;
+        let if_token = self.assert_token(T::KeywordIf);
+        self.expect_token(T::LParen)?;
         let condition = self.expect_expr()?;
-        self.expect_token(token!(RParen))?;
+        self.expect_token(T::RParen)?;
         self.parse_ptr_payload()?;
 
         let mut else_required = false;
@@ -16,11 +16,11 @@ impl Parser<'_, '_> {
             }
             let assign_expr = self.parse_assign_expr()?;
             if assign_expr == 0 {
-                return self.fail(error!(ExpectedBlockOrAssignment));
+                return self.fail(E::ExpectedBlockOrAssignment);
             }
-            if self.eat_token(token!(Semicolon)).is_some() {
+            if self.eat_token(T::Semicolon).is_some() {
                 return Ok(self.add_node(Node {
-                    tag: node!(IfSimple),
+                    tag: N::IfSimple,
                     main_token: if_token,
                     data: node::Data {
                         lhs: condition,
@@ -31,12 +31,12 @@ impl Parser<'_, '_> {
             else_required = true;
             assign_expr
         };
-        if self.eat_token(token!(KeywordElse)).is_none() {
+        if self.eat_token(T::KeywordElse).is_none() {
             if else_required {
-                self.warn(error!(ExpectedSemiOrElse));
+                self.warn(E::ExpectedSemiOrElse);
             }
             return Ok(self.add_node(Node {
-                tag: node!(IfSimple),
+                tag: N::IfSimple,
                 main_token: if_token,
                 data: node::Data {
                     lhs: condition,
@@ -52,7 +52,7 @@ impl Parser<'_, '_> {
             else_expr,
         });
         Ok(self.add_node(Node {
-            tag: node!(If),
+            tag: N::If,
             main_token: if_token,
             data: node::Data { lhs, rhs },
         }))
@@ -66,20 +66,20 @@ impl Parser<'_, '_> {
         &mut self,
         mut body_parse_fn: impl FnMut(&mut Self) -> Result<node::Index>,
     ) -> Result<node::Index> {
-        let Some(if_token) = self.eat_token(token!(KeywordIf)) else {
+        let Some(if_token) = self.eat_token(T::KeywordIf) else {
             return Ok(NULL_NODE);
         };
-        self.expect_token(token!(LParen))?;
+        self.expect_token(T::LParen)?;
         let condition = self.expect_expr()?;
-        self.expect_token(token!(RParen))?;
+        self.expect_token(T::RParen)?;
         self.parse_ptr_payload()?;
 
         let then_expr = body_parse_fn(self)?;
         assert!(then_expr != 0);
 
-        if self.eat_token(token!(KeywordElse)).is_none() {
+        if self.eat_token(T::KeywordElse).is_none() {
             return Ok(self.add_node(Node {
-                tag: node!(IfSimple),
+                tag: N::IfSimple,
                 main_token: if_token,
                 data: node::Data {
                     lhs: condition,
@@ -97,7 +97,7 @@ impl Parser<'_, '_> {
             else_expr,
         });
         Ok(self.add_node(Node {
-            tag: node!(If),
+            tag: N::If,
             main_token: if_token,
             data: node::Data { lhs, rhs },
         }))

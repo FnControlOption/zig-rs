@@ -17,7 +17,7 @@ pub fn render_tree(writer: &mut dyn Write, tree: &Ast, fixups: Fixups) -> Result
     let comment_end_loc = tree.token_start(0);
     r.render_comments(0, comment_end_loc as usize)?;
 
-    if tree.token_tag(0) == token!(ContainerDocComment) {
+    if tree.token_tag(0) == T::ContainerDocComment {
         todo!("render_tree")
     }
 

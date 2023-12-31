@@ -484,14 +484,14 @@ pub struct Data {
     pub rhs: Index,
 }
 
-pub trait ExtraData<const N: usize>: Sized {
-    fn to_array(&self) -> [Index; N];
+pub trait ExtraData<const S: usize>: Sized {
+    fn to_array(&self) -> [Index; S];
 
     fn from_slice(slice: &[Index]) -> Self;
 
     fn field_range(start: Index) -> std::ops::Range<usize> {
         let start = start as usize;
-        let end = start + N;
+        let end = start + S;
         start..end
     }
 
@@ -519,7 +519,7 @@ macro_rules! extra_data {
         }
 
         impl GetExtraData<$type> for Ast<'_> {
-            fn extra_data(&self, index: node::Index) -> $type {
+            fn extra_data(&self, index: Index) -> $type {
                 $type::from_ast(self, index)
             }
         }

@@ -8,7 +8,7 @@ impl Parser<'_, '_> {
         }
         let assign_expr = self.parse_assign_expr()?;
         if assign_expr != 0 {
-            self.expect_semicolon(error!(ExpectedSemiAfterStmt), true)?;
+            self.expect_semicolon(E::ExpectedSemiAfterStmt, true)?;
             return Ok(assign_expr);
         }
         Ok(NULL_NODE)
@@ -17,16 +17,16 @@ impl Parser<'_, '_> {
     pub(super) fn expect_block_expr_statement(&mut self) -> Result<node::Index> {
         let node = self.parse_block_expr_statement()?;
         if node == 0 {
-            return self.fail(error!(ExpectedBlockOrExpr));
+            return self.fail(E::ExpectedBlockOrExpr);
         }
         Ok(node)
     }
 
     pub(super) fn parse_block_expr(&mut self) -> Result<node::Index> {
         match self.token_tag(self.tok_i) {
-            token!(Identifier) => {
-                if self.token_tag(self.tok_i + 1) == token!(Colon)
-                    && self.token_tag(self.tok_i + 2) == token!(LBrace)
+            T::Identifier => {
+                if self.token_tag(self.tok_i + 1) == T::Colon
+                    && self.token_tag(self.tok_i + 2) == T::LBrace
                 {
                     self.tok_i += 2;
                     self.parse_block()
@@ -34,18 +34,18 @@ impl Parser<'_, '_> {
                     Ok(NULL_NODE)
                 }
             }
-            token!(LBrace) => self.parse_block(),
+            T::LBrace => self.parse_block(),
             _ => Ok(NULL_NODE),
         }
     }
 
     pub(super) fn parse_block(&mut self) -> Result<node::Index> {
-        let Some(lbrace) = self.eat_token(token!(LBrace)) else {
+        let Some(lbrace) = self.eat_token(T::LBrace) else {
             return Ok(NULL_NODE);
         };
         let mut statements = Vec::new();
         loop {
-            if self.token_tag(self.tok_i) == token!(RBrace) {
+            if self.token_tag(self.tok_i) == T::RBrace {
                 break;
             }
             let statement = self.expect_statement_recoverable()?;
@@ -54,26 +54,26 @@ impl Parser<'_, '_> {
             }
             statements.push(statement);
         }
-        self.expect_token(token!(RBrace))?;
-        let semicolon = self.token_tag(self.tok_i - 2) == token!(Semicolon);
+        self.expect_token(T::RBrace)?;
+        let semicolon = self.token_tag(self.tok_i - 2) == T::Semicolon;
         match statements[..] {
             [] => Ok(self.add_node(Node {
-                tag: node!(BlockTwo),
+                tag: N::BlockTwo,
                 main_token: lbrace,
                 data: node::Data { lhs: 0, rhs: 0 },
             })),
             [lhs] => Ok(self.add_node(Node {
                 tag: (match semicolon {
-                    true => node!(BlockTwoSemicolon),
-                    false => node!(BlockTwo),
+                    true => N::BlockTwoSemicolon,
+                    false => N::BlockTwo,
                 }),
                 main_token: lbrace,
                 data: node::Data { lhs, rhs: 0 },
             })),
             [lhs, rhs] => Ok(self.add_node(Node {
                 tag: (match semicolon {
-                    true => node!(BlockTwoSemicolon),
-                    false => node!(BlockTwo),
+                    true => N::BlockTwoSemicolon,
+                    false => N::BlockTwo,
                 }),
                 main_token: lbrace,
                 data: node::Data { lhs, rhs },
@@ -82,8 +82,8 @@ impl Parser<'_, '_> {
                 let span = self.list_to_span(&statements);
                 Ok(self.add_node(Node {
                     tag: (match semicolon {
-                        true => node!(BlockSemicolon),
-                        false => node!(Block),
+                        true => N::BlockSemicolon,
+                        false => N::Block,
                     }),
                     main_token: lbrace,
                     data: node::Data {
@@ -96,8 +96,7 @@ impl Parser<'_, '_> {
     }
 
     pub(super) fn parse_block_label(&mut self) -> node::Index {
-        if self.token_tag(self.tok_i) == token!(Identifier)
-            && self.token_tag(self.tok_i + 1) == token!(Colon)
+        if self.token_tag(self.tok_i) == T::Identifier && self.token_tag(self.tok_i + 1) == T::Colon
         {
             let identifier = self.tok_i;
             self.tok_i += 2;

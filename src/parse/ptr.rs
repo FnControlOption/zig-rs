@@ -9,25 +9,25 @@ pub struct PtrModifiers {
 
 impl Parser<'_, '_> {
     pub(super) fn parse_ptr_payload(&mut self) -> Result<TokenIndex> {
-        if self.eat_token(token!(Pipe)).is_none() {
+        if self.eat_token(T::Pipe).is_none() {
             return Ok(NULL_NODE);
         }
-        self.eat_token(token!(Asterisk));
-        let identifier = self.expect_token(token!(Identifier))?;
-        self.expect_token(token!(Pipe))?;
+        self.eat_token(T::Asterisk);
+        let identifier = self.expect_token(T::Identifier)?;
+        self.expect_token(T::Pipe)?;
         Ok(identifier)
     }
 
     pub(super) fn parse_ptr_index_payload(&mut self) -> Result<TokenIndex> {
-        if self.eat_token(token!(Pipe)).is_none() {
+        if self.eat_token(T::Pipe).is_none() {
             return Ok(NULL_NODE);
         }
-        self.eat_token(token!(Asterisk));
-        let identifier = self.expect_token(token!(Identifier))?;
-        if self.eat_token(token!(Comma)).is_some() {
-            self.expect_token(token!(Identifier))?;
+        self.eat_token(T::Asterisk);
+        let identifier = self.expect_token(T::Identifier)?;
+        if self.eat_token(T::Comma).is_some() {
+            self.expect_token(T::Identifier)?;
         }
-        self.expect_token(token!(Pipe))?;
+        self.expect_token(T::Pipe)?;
         Ok(identifier)
     }
 
@@ -43,46 +43,46 @@ impl Parser<'_, '_> {
         let mut saw_allowzero = false;
         loop {
             match self.token_tag(self.tok_i) {
-                token!(KeywordAlign) => {
+                T::KeywordAlign => {
                     if result.align_node != 0 {
-                        self.warn(error!(ExtraAlignQualifier));
+                        self.warn(E::ExtraAlignQualifier);
                     }
                     self.tok_i += 1;
-                    self.expect_token(token!(LParen))?;
+                    self.expect_token(T::LParen)?;
                     result.align_node = self.expect_expr()?;
 
-                    if self.eat_token(token!(Colon)).is_some() {
+                    if self.eat_token(T::Colon).is_some() {
                         result.bit_range_start = self.expect_expr()?;
-                        self.expect_token(token!(Colon))?;
+                        self.expect_token(T::Colon)?;
                         result.bit_range_start = self.expect_expr()?;
                     }
 
-                    self.expect_token(token!(RParen))?;
+                    self.expect_token(T::RParen)?;
                 }
-                token!(KeywordConst) => {
+                T::KeywordConst => {
                     if saw_const {
-                        self.warn(error!(ExtraConstQualifier));
+                        self.warn(E::ExtraConstQualifier);
                     }
                     self.tok_i += 1;
                     saw_const = true;
                 }
-                token!(KeywordVolatile) => {
+                T::KeywordVolatile => {
                     if saw_volatile {
-                        self.warn(error!(ExtraVolatileQualifier));
+                        self.warn(E::ExtraVolatileQualifier);
                     }
                     self.tok_i += 1;
                     saw_volatile = true;
                 }
-                token!(KeywordAllowzero) => {
+                T::KeywordAllowzero => {
                     if saw_allowzero {
-                        self.warn(error!(ExtraAllowzeroQualifier));
+                        self.warn(E::ExtraAllowzeroQualifier);
                     }
                     self.tok_i += 1;
                     saw_allowzero = true;
                 }
-                token!(KeywordAddrspace) => {
+                T::KeywordAddrspace => {
                     if result.addrspace_node != 0 {
-                        self.warn(error!(ExtraAddrspaceQualifier));
+                        self.warn(E::ExtraAddrspaceQualifier);
                     }
                     result.addrspace_node = self.parse_addr_space()?;
                 }
