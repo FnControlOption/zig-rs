@@ -1,3 +1,7 @@
+#![allow(clippy::assign_op_pattern)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::identity_op)]
+#![allow(clippy::should_implement_trait)]
 #![allow(dead_code)]
 #![allow(unreachable_code)]
 #![allow(unused_assignments)]

@@ -103,7 +103,7 @@ impl Parser<'_, '_> {
             } else {
                 let expr = self.parse_expr()?;
                 if expr == 0 {
-                    if scratch.len() == 0 {
+                    if scratch.is_empty() {
                         return self.fail(E::ExpectedStatement);
                     } else {
                         return self.fail(E::ExpectedExprOrVarDecl);

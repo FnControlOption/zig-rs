@@ -193,7 +193,7 @@ impl<'src> Parser<'src, '_> {
             },
         });
         let Ok(node_index) = self.expect_expr() else {
-            debug_assert!(self.errors.len() > 0);
+            debug_assert!(!self.errors.is_empty());
             return;
         };
         if self.token_tag(self.tok_i) != T::Eof {
@@ -224,7 +224,7 @@ impl<'src> Parser<'src, '_> {
 
     fn tokens_on_same_line(&self, token1: TokenIndex, token2: TokenIndex) -> bool {
         let s = self.source(self.token_start(token1)..self.token_start(token2));
-        s.iter().position(|&c| c == b'\n').is_none()
+        s.iter().all(|&b| b != b'\n')
     }
 
     fn eat_token(&mut self, tag: token::Tag) -> Option<TokenIndex> {

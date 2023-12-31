@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 #![allow(dead_code)]
 #![allow(unreachable_code)]
 #![allow(unused_assignments)]

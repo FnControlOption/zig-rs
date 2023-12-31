@@ -163,17 +163,20 @@ impl Write for AutoIndentingStream<'_> {
 
 impl AutoIndentingStream<'_> {
     fn set_indent_delta(&mut self, new_indent_delta: usize) {
-        if self.indent_delta == new_indent_delta {
-            return;
-        } else if self.indent_delta > new_indent_delta {
-            debug_assert_eq!(self.indent_delta % new_indent_delta, 0);
-            self.indent_count = self.indent_count * (self.indent_delta / new_indent_delta);
-        } else {
-            debug_assert_eq!(
-                (self.indent_count * self.indent_delta) % new_indent_delta,
-                0
-            );
-            self.indent_count = self.indent_count / (new_indent_delta / self.indent_delta);
+        use std::cmp::Ordering;
+        match self.indent_delta.cmp(&new_indent_delta) {
+            Ordering::Equal => return,
+            Ordering::Greater => {
+                debug_assert_eq!(self.indent_delta % new_indent_delta, 0);
+                self.indent_count = self.indent_count * (self.indent_delta / new_indent_delta);
+            }
+            Ordering::Less => {
+                debug_assert_eq!(
+                    (self.indent_count * self.indent_delta) % new_indent_delta,
+                    0
+                );
+                self.indent_count = self.indent_count / (new_indent_delta / self.indent_delta);
+            }
         }
         self.indent_delta = new_indent_delta;
     }

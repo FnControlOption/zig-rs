@@ -280,11 +280,7 @@ impl Parser<'_, '_> {
                     }
                 }
                 T::LParen | T::LBracket | T::LBrace => level += 1,
-                T::RParen | T::RBracket => {
-                    if level != 0 {
-                        level -= 1;
-                    }
-                }
+                T::RParen | T::RBracket => level = level.saturating_sub(1),
                 T::RBrace => {
                     if level == 0 {
                         self.tok_i -= 1;
@@ -394,7 +390,7 @@ impl Parser<'_, '_> {
         if self.token_tag(self.tok_i) != T::KeywordUsingnamespace {
             return self.fail(E::ExpectedPubItem);
         }
-        return self.expect_using_namespace();
+        self.expect_using_namespace()
     }
 
     pub(super) fn expect_top_level_decl_recoverable(&mut self) -> node::Index {
@@ -600,7 +596,7 @@ impl Parser<'_, '_> {
 
         if arg_expr == 0 {
             if members.len <= 2 {
-                return Ok(self.add_node(Node {
+                Ok(self.add_node(Node {
                     tag: match members.trailing {
                         true => N::ContainerDeclTwoTrailing,
                         false => N::ContainerDeclTwo,
@@ -610,10 +606,10 @@ impl Parser<'_, '_> {
                         lhs: members.lhs,
                         rhs: members.rhs,
                     },
-                }));
+                }))
             } else {
                 let span = members.to_span(self);
-                return Ok(self.add_node(Node {
+                Ok(self.add_node(Node {
                     tag: match members.trailing {
                         true => N::ContainerDeclTrailing,
                         false => N::ContainerDecl,
@@ -623,19 +619,19 @@ impl Parser<'_, '_> {
                         lhs: span.start,
                         rhs: span.end,
                     },
-                }));
+                }))
             }
         } else {
             let span = members.to_span(self);
             let rhs = self.add_extra(span);
-            return Ok(self.add_node(Node {
+            Ok(self.add_node(Node {
                 tag: match members.trailing {
                     true => N::ContainerDeclArgTrailing,
                     false => N::ContainerDeclArg,
                 },
                 main_token,
                 data: node::Data { lhs: arg_expr, rhs },
-            }));
+            }))
         }
     }
 }

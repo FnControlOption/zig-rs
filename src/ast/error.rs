@@ -90,9 +90,9 @@ impl Ast<'_> {
                 self.token_tag(parse_error.token + parse_error.token_is_prev as TokenIndex)
                     .symbol(),
             )),
-            Tag::ExpectedPubItem => Cow::from(format!(
-                "expected function or variable declaration after pub"
-            )),
+            Tag::ExpectedPubItem => {
+                Cow::from("expected function or variable declaration after pub")
+            }
             Tag::ExpectedReturnType => Cow::from(format!(
                 "expected return type expression, found '{}'",
                 self.token_tag(parse_error.token + parse_error.token_is_prev as TokenIndex)

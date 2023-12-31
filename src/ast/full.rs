@@ -1373,12 +1373,11 @@ pub struct VarDeclComponents {
 
 impl VarDecl {
     pub fn first_token(&self) -> TokenIndex {
-        return self
-            .visib_token
+        self.visib_token
             .or(self.extern_export_token)
             .or(self.threadlocal_token)
             .or(self.comptime_token)
-            .unwrap_or(self.ast.mut_token);
+            .unwrap_or(self.ast.mut_token)
     }
 }
 
