@@ -9,6 +9,8 @@ pub struct Node {
 
 pub type Index = u32;
 
+/// Note: The FooComma/FooSemicolon variants exist to ease the implementation of
+/// Ast.lastToken()
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Tag {
     /// sub_list[lhs...rhs]

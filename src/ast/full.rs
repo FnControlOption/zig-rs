@@ -1,3 +1,5 @@
+//! Fully assembled AST node information.
+
 use super::*;
 
 impl<'src> Ast<'src> {

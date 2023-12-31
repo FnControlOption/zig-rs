@@ -111,14 +111,27 @@ fn write_fixing_whitespace(writer: &mut dyn Write, slice: &[u8]) -> Result<()> {
     }
 }
 
+/// Automatically inserts indentation of written data by keeping
+/// track of the current indentation level
 struct AutoIndentingStream<'write> {
     underlying_writer: &'write mut dyn Write,
+
+    /// Offset into the source at which formatting has been disabled with
+    /// a `zig fmt: off` comment.
+    ///
+    /// If non-null, the AutoIndentingStream will not write any bytes
+    /// to the underlying writer. It will however continue to track the
+    /// indentation level.
     disabled_offset: Option<usize>,
+
     indent_count: usize,
     indent_delta: usize,
     current_line_empty: bool,
+    /// automatically popped when applied
     indent_one_shot_count: usize,
+    /// the most recently applied indent
     applied_indent: usize,
+    /// not used until the next line
     indent_next_line: usize,
 }
 
@@ -188,6 +201,7 @@ impl AutoIndentingStream<'_> {
         self.indent_next_line = 0;
     }
 
+    /// Insert a newline unless the current line is blank
     fn maybe_insert_newline(&mut self) -> Result<()> {
         if !self.current_line_empty {
             self.insert_new_line()?;
@@ -195,24 +209,32 @@ impl AutoIndentingStream<'_> {
         Ok(())
     }
 
+    /// Push default indentation
+    /// Doesn't actually write any indentation.
+    /// Just primes the stream to be able to write the correct indentation if it needs to.
     fn push_indent(&mut self) {
         self.indent_count += 1;
     }
 
+    /// Push an indent that is automatically popped after being applied
     fn push_indent_one_shot(&mut self) {
         self.indent_one_shot_count += 1;
         self.push_indent();
     }
 
+    /// Turns all one-shot indents into regular indents
+    /// Returns number of indents that must now be manually popped
     fn lock_one_shot_indent(&mut self) -> usize {
         std::mem::replace(&mut self.indent_one_shot_count, 0)
     }
 
+    /// Push an indent that should not take effect until the next line
     fn push_indent_next_line(&mut self) {
         self.indent_next_line += 1;
         self.push_indent();
     }
 
+    /// Writes ' ' bytes if the current line is empty
     fn pop_indent(&mut self) {
         debug_assert_ne!(self.indent_count, 0);
         self.indent_count -= 1;
@@ -222,6 +244,7 @@ impl AutoIndentingStream<'_> {
         }
     }
 
+    /// Checks to see if the most recent indentation exceeds the currently pushed indents
     fn apply_indent(&mut self) -> Result<()> {
         let current_indent = self.current_indent();
         if self.current_line_empty && current_indent > 0 {

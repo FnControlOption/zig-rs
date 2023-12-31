@@ -21,30 +21,6 @@ use node::ExtraData;
 pub use node::Node;
 pub use visitor::Visitor;
 
-pub struct Ast<'src> {
-    pub source: &'src [u8],
-    pub token_tags: Vec<token::Tag>,
-    pub token_starts: Vec<ByteOffset>,
-    pub nodes: Vec<Node>,
-    pub extra_data: Vec<node::Index>,
-    pub mode: Mode,
-    pub errors: Vec<Error>,
-}
-impl<'src> Ast<'src> {
-    pub fn source(&self, range: std::ops::Range<ByteOffset>) -> &'src [u8] {
-        &self.source[range.start as usize..range.end as usize]
-    }
-    pub fn token_tag(&self, index: TokenIndex) -> token::Tag {
-        self.token_tags[index as usize]
-    }
-    pub fn token_start(&self, index: TokenIndex) -> ByteOffset {
-        self.token_starts[index as usize]
-    }
-    pub fn node(&self, index: node::Index) -> &Node {
-        &self.nodes[index as usize]
-    }
-}
-
 pub type TokenIndex = u32;
 pub type ByteOffset = u32;
 
@@ -61,7 +37,40 @@ pub enum Mode {
     Zon,
 }
 
+/// Abstract Syntax Tree for Zig source code.
+/// For Zig syntax, the root node is at nodes[0] and contains the list of
+/// sub-nodes.
+/// For Zon syntax, the root node is at nodes[0] and contains lhs as the node
+/// index of the main expression.
+pub struct Ast<'src> {
+    /// Reference to externally-owned data.
+    pub source: &'src [u8],
+
+    pub token_tags: Vec<token::Tag>,
+    pub token_starts: Vec<ByteOffset>,
+    /// The root AST node is assumed to be index 0. Since there can be no
+    /// references to the root node, this means 0 is available to indicate null.
+    pub nodes: Vec<Node>,
+    pub extra_data: Vec<node::Index>,
+    pub mode: Mode,
+
+    pub errors: Vec<Error>,
+}
+
 impl<'src> Ast<'src> {
+    pub fn source(&self, range: std::ops::Range<ByteOffset>) -> &'src [u8] {
+        &self.source[range.start as usize..range.end as usize]
+    }
+    pub fn token_tag(&self, index: TokenIndex) -> token::Tag {
+        self.token_tags[index as usize]
+    }
+    pub fn token_start(&self, index: TokenIndex) -> ByteOffset {
+        self.token_starts[index as usize]
+    }
+    pub fn node(&self, index: node::Index) -> &Node {
+        &self.nodes[index as usize]
+    }
+
     pub fn parse(source: &'src [u8], mode: Mode) -> Self {
         // Empirically, the zig std lib has an 8:1 ratio of source bytes to token count.
         let estimated_token_count = source.len() / 8;
