@@ -117,7 +117,7 @@ impl Parser<'_, '_> {
         }
 
         let lhs_count = scratch.len();
-        assert!(lhs_count > 0);
+        debug_assert!(lhs_count > 0);
 
         let equal_token = match self.eat_token(T::Equal) {
             Some(token) => token,

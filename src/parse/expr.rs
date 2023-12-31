@@ -107,7 +107,7 @@ impl Parser<'_, '_> {
             })
         }
 
-        assert!(min_prec >= 0);
+        debug_assert!(min_prec >= 0);
         let mut node = self.parse_prefix_expr()?;
         if node == 0 {
             return Ok(NULL_NODE);

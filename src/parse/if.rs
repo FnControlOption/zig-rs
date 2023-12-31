@@ -75,7 +75,7 @@ impl Parser<'_, '_> {
         self.parse_ptr_payload()?;
 
         let then_expr = body_parse_fn(self)?;
-        assert!(then_expr != 0);
+        debug_assert!(then_expr != 0);
 
         if self.eat_token(T::KeywordElse).is_none() {
             return Ok(self.add_node(Node {
@@ -89,7 +89,7 @@ impl Parser<'_, '_> {
         }
         self.parse_payload()?;
         let else_expr = body_parse_fn(self)?;
-        assert!(else_expr != 0);
+        debug_assert!(else_expr != 0);
 
         let lhs = condition;
         let rhs = self.add_extra(node::If {

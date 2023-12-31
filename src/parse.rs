@@ -1,12 +1,9 @@
 use crate::ast;
-use crate::ast::{error, node, Error, Node, TokenIndex};
-use crate::token;
-
 use crate::ast::error::Tag as E;
 use crate::ast::node::Tag as N;
+use crate::ast::*;
+use crate::token;
 use crate::token::Tag as T;
-
-mod misc;
 
 mod asm;
 mod assign;
@@ -16,6 +13,7 @@ mod expr;
 mod r#fn;
 mod r#for;
 mod r#if;
+mod misc;
 mod ptr;
 mod statement;
 mod switch;
@@ -42,27 +40,22 @@ pub struct Parser<'src, 'tok> {
     pub extra_data: Vec<node::Index>,
 }
 
-impl Parser<'_, '_> {
-    fn source(&self, range: std::ops::Range<ast::ByteOffset>) -> &[u8] {
+impl<'src> Parser<'src, '_> {
+    fn source(&self, range: std::ops::Range<ast::ByteOffset>) -> &'src [u8] {
         &self.source[range.start as usize..range.end as usize]
     }
-
     fn source_byte(&self, index: ast::ByteOffset) -> u8 {
         self.source[index as usize]
     }
-
     fn token_tag(&self, index: TokenIndex) -> token::Tag {
         self.token_tags[index as usize]
     }
-
     fn token_start(&self, index: TokenIndex) -> ast::ByteOffset {
         self.token_starts[index as usize]
     }
-
     fn node(&self, index: node::Index) -> &Node {
         &self.nodes[index as usize]
     }
-
     fn node_mut(&mut self, index: node::Index) -> &mut Node {
         &mut self.nodes[index as usize]
     }
@@ -71,9 +64,7 @@ impl Parser<'_, '_> {
     fn dump_token(&self) {
         println!("{:?}", self.token_tag(self.tok_i));
     }
-}
 
-impl Parser<'_, '_> {
     fn list_to_span(&mut self, list: &[node::Index]) -> node::SubRange {
         self.extra_data.extend_from_slice(list);
         node::SubRange {
@@ -202,7 +193,7 @@ impl Parser<'_, '_> {
             },
         });
         let Ok(node_index) = self.expect_expr() else {
-            assert!(self.errors.len() > 0);
+            debug_assert!(self.errors.len() > 0);
             return;
         };
         if self.token_tag(self.tok_i) != T::Eof {
@@ -246,7 +237,7 @@ impl Parser<'_, '_> {
 
     fn assert_token(&mut self, tag: token::Tag) -> TokenIndex {
         let token = self.next_token();
-        assert_eq!(self.token_tag(token), tag);
+        debug_assert_eq!(self.token_tag(token), tag);
         token
     }
 

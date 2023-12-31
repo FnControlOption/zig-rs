@@ -3,6 +3,18 @@ use std::fmt::{Error, Write};
 
 type Result<T> = std::result::Result<T, Error>;
 
+impl Ast<'_> {
+    pub fn render(&self) -> Result<String> {
+        let mut buffer = String::new();
+        self.render_to_writer(&mut buffer, Default::default())?;
+        Ok(buffer)
+    }
+
+    pub fn render_to_writer(&self, writer: &mut dyn Write, fixups: render::Fixups) -> Result<()> {
+        render_tree(writer, self, fixups)
+    }
+}
+
 const INDENT_DELTA: usize = 4;
 const ASM_INDENT_DELTA: usize = 2;
 
@@ -10,7 +22,7 @@ const ASM_INDENT_DELTA: usize = 2;
 pub struct Fixups {}
 
 pub fn render_tree(writer: &mut dyn Write, tree: &Ast, fixups: Fixups) -> Result<()> {
-    assert_eq!(tree.errors.len(), 0);
+    debug_assert_eq!(tree.errors.len(), 0);
     let mut ais = AutoIndentingStream::new(INDENT_DELTA, writer);
     let mut r = Render { ais, tree, fixups };
 
@@ -141,10 +153,10 @@ impl AutoIndentingStream<'_> {
         if self.indent_delta == new_indent_delta {
             return;
         } else if self.indent_delta > new_indent_delta {
-            assert_eq!(self.indent_delta % new_indent_delta, 0);
+            debug_assert_eq!(self.indent_delta % new_indent_delta, 0);
             self.indent_count = self.indent_count * (self.indent_delta / new_indent_delta);
         } else {
-            assert_eq!(
+            debug_assert_eq!(
                 (self.indent_count * self.indent_delta) % new_indent_delta,
                 0
             );
@@ -202,7 +214,7 @@ impl AutoIndentingStream<'_> {
     }
 
     fn pop_indent(&mut self) {
-        assert_ne!(self.indent_count, 0);
+        debug_assert_ne!(self.indent_count, 0);
         self.indent_count -= 1;
 
         if self.indent_next_line > 0 {

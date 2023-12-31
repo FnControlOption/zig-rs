@@ -63,7 +63,7 @@ impl Parser<'_, '_> {
                         }
                         let comptime_token = self.next_token();
                         let block = self.parse_block().unwrap_or_else(|err| {
-                            assert!(matches!(err, ParseError));
+                            debug_assert!(matches!(err, ParseError));
                             self.find_next_container_member();
                             NULL_NODE
                         });
@@ -323,7 +323,7 @@ impl Parser<'_, '_> {
 
     pub(super) fn expect_test_decl_recoverable(&mut self) -> node::Index {
         self.expect_test_decl().unwrap_or_else(|err| {
-            assert!(matches!(err, ParseError));
+            debug_assert!(matches!(err, ParseError));
             self.find_next_container_member();
             NULL_NODE
         })
@@ -365,7 +365,7 @@ impl Parser<'_, '_> {
                         },
                     });
                     let body_block = self.parse_block()?;
-                    assert!(body_block != 0);
+                    debug_assert!(body_block != 0);
                     self.node_mut(fn_decl).data.rhs = body_block;
                     return Ok(fn_decl);
                 }
@@ -399,7 +399,7 @@ impl Parser<'_, '_> {
 
     pub(super) fn expect_top_level_decl_recoverable(&mut self) -> node::Index {
         self.expect_top_level_decl().unwrap_or_else(|err| {
-            assert!(matches!(err, ParseError));
+            debug_assert!(matches!(err, ParseError));
             self.find_next_container_member();
             NULL_NODE
         })
@@ -421,7 +421,7 @@ impl Parser<'_, '_> {
 
     pub(super) fn expect_using_namespace_recoverable(&mut self) -> node::Index {
         self.expect_using_namespace().unwrap_or_else(|err| {
-            assert!(matches!(err, ParseError));
+            debug_assert!(matches!(err, ParseError));
             self.find_next_container_member();
             NULL_NODE
         })

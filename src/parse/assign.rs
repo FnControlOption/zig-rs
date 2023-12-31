@@ -85,7 +85,7 @@ impl Parser<'_, '_> {
         let rhs = self.expect_expr()?;
 
         let lhs_count = scratch.len();
-        assert!(lhs_count > 1);
+        debug_assert!(lhs_count > 1);
 
         let extra_start = self.extra_data.len();
         self.extra_data.reserve(lhs_count + 1);

@@ -1,6 +1,15 @@
+use super::*;
 use std::borrow::Cow;
 
-use super::*;
+impl Ast<'_> {
+    pub fn error_offset(&self, parse_error: &Error) -> u32 {
+        if parse_error.token_is_prev {
+            self.token_slice(parse_error.token).len() as u32
+        } else {
+            0
+        }
+    }
+}
 
 pub struct Error {
     pub tag: Tag,

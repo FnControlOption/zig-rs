@@ -160,7 +160,7 @@ impl Parser<'_, '_> {
             return match self.expect_statement(true) {
                 Ok(statement) => Ok(statement),
                 Err(err) => {
-                    assert!(matches!(err, ParseError));
+                    debug_assert!(matches!(err, ParseError));
                     self.find_next_stmt();
                     match self.token_tag(self.tok_i) {
                         T::RBrace => Ok(NULL_NODE),

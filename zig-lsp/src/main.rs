@@ -40,7 +40,7 @@ macro_rules! semantic_tokens_types {
     ($($name:ident),*) => {
         fn semantic_token_types() -> Vec<SemanticTokenType> {
             let types = vec![$(SemanticTokenType::$name),*];
-            $(assert_eq!(SemanticTokenType::$name, types[semantic_tokens::$name as usize]);)*
+            $(debug_assert_eq!(SemanticTokenType::$name, types[semantic_tokens::$name as usize]);)*
             types
         }
     };
@@ -114,7 +114,7 @@ impl LanguageServer for Backend {
             content_changes,
         }: DidChangeTextDocumentParams,
     ) {
-        assert_eq!(content_changes.len(), 1);
+        debug_assert_eq!(content_changes.len(), 1);
         let text = &content_changes[0].text;
         self.parse_text(uri, version, text).await;
     }
@@ -212,7 +212,7 @@ impl Backend {
             fn push_token(&mut self, tree: &Ast, token_index: TokenIndex, token_type: u32) {
                 let start_offset = match &self.previous {
                     Some((previous_index, previous_loc)) => {
-                        assert!(*previous_index < token_index);
+                        debug_assert!(*previous_index < token_index);
                         previous_loc.line_start
                     }
                     None => 0,
