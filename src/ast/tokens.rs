@@ -295,7 +295,7 @@ impl<'src> Ast<'src> {
                         }
                         T::LBracket => n.main_token,
                         _ => unreachable!(),
-                    }) - end_offset
+                    }) - end_offset;
                 }
 
                 N::SwitchCaseOne => {

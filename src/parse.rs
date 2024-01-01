@@ -1,9 +1,8 @@
-use crate::ast;
 use crate::ast::error::Tag as E;
 use crate::ast::node::Tag as N;
 use crate::ast::*;
-use crate::token;
 use crate::token::Tag as T;
+use crate::{ast, token};
 
 mod asm;
 mod assign;

@@ -1,5 +1,6 @@
-use super::*;
 use std::borrow::Cow;
+
+use super::*;
 
 impl Ast<'_> {
     /// Returns an extra offset for column and byte offset of errors that

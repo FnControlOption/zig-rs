@@ -1,9 +1,8 @@
 use crate::ast::error::Tag as E;
 use crate::ast::node::Tag as N;
 use crate::parse::Parser;
-use crate::token;
 use crate::token::Tag as T;
-use crate::Tokenizer;
+use crate::{token, Tokenizer};
 
 pub mod display;
 pub mod error;

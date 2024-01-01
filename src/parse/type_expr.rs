@@ -721,7 +721,7 @@ impl Parser<'_, '_> {
                                     break;
                                 }
                                 T::Colon | T::RParen | T::RBracket => {
-                                    return self.fail_expected(T::RBrace)
+                                    return self.fail_expected(T::RBrace);
                                 }
                                 _ => self.warn(E::ExpectedCommaAfterInitializer),
                             }
@@ -780,7 +780,7 @@ impl Parser<'_, '_> {
                                 break;
                             }
                             T::Colon | T::RParen | T::RBracket => {
-                                return self.fail_expected(T::RBrace)
+                                return self.fail_expected(T::RBrace);
                             }
                             _ => self.warn(E::ExpectedCommaAfterInitializer),
                         }
@@ -843,7 +843,7 @@ impl Parser<'_, '_> {
                                 break;
                             }
                             T::Colon | T::RParen | T::RBracket => {
-                                return self.fail_expected(T::RBrace)
+                                return self.fail_expected(T::RBrace);
                             }
                             _ => self.warn(E::ExpectedCommaAfterField),
                         }

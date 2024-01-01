@@ -1,5 +1,6 @@
-use super::*;
 use std::fmt::{Error, Write};
+
+use super::*;
 
 type Result<T> = std::result::Result<T, Error>;
 

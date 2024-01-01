@@ -1,7 +1,7 @@
-use super::*;
-
 use std::collections::HashMap;
 use std::sync::OnceLock;
+
+use super::*;
 
 impl Parser<'_, '_> {
     pub(super) fn parse_expr(&mut self) -> Result<node::Index> {

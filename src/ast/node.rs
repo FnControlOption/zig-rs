@@ -1,5 +1,6 @@
-use super::*;
 use bitfield::bitfield;
+
+use super::*;
 
 pub struct Node {
     pub tag: Tag,
