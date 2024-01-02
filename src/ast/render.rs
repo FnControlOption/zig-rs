@@ -1,15 +1,14 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Error, Write};
+use std::io::{Error, ErrorKind, Result, Write};
 
 use super::*;
+use crate::fmt::Quotes;
 use crate::{string_literal, utils};
 
-type Result<T> = std::result::Result<T, Error>;
-
 impl Ast<'_> {
-    pub fn render(&self) -> Result<String> {
-        let mut buffer = String::new();
+    pub fn render(&self) -> Result<Vec<u8>> {
+        let mut buffer = Vec::new();
         self.render_to_writer(&mut buffer, Default::default())?;
         Ok(buffer)
     }
@@ -469,7 +468,8 @@ impl Render<'_, '_, '_> {
                 }
                 _ => {
                     // Write the comment minus trailing whitespace.
-                    write!(self.ais, "{}\n", str_from_utf8(trimmed_comment)?)?;
+                    self.ais.write_all(trimmed_comment)?;
+                    write!(self.ais, "\n")?;
                 }
             }
         }
@@ -591,11 +591,10 @@ impl Render<'_, '_, '_> {
         for param in fn_proto.iterate(self.tree) {
             let name_ident = param.name_token.unwrap();
             debug_assert_eq!(self.tree.token_tag(name_ident), T::Identifier);
-            write!(
-                self.ais,
-                "_ = {};\n",
-                str_from_utf8(token_slice_for_render(self.tree, name_ident))?
-            )?;
+            write!(self.ais, "_ = ")?;
+            self.ais
+                .write_all(token_slice_for_render(self.tree, name_ident))?;
+            write!(self.ais, "\n")?;
         }
         Ok(())
     }
@@ -612,21 +611,19 @@ fn render_identifier_contents(writer: &mut dyn Write, bytes: &[u8]) -> Result<()
                 let escape_sequence = &bytes[old_pos..pos];
                 match res {
                     Ok(codepoint) if codepoint <= 0x7f => {
-                        let buf = [codepoint as u8];
-                        write!(writer, "{}", crate::FormatEscapes::double_quoted(&buf))?;
+                        crate::fmt_escapes(writer, &[codepoint as u8], Quotes::Double)?;
                     }
                     _ => {
-                        write!(writer, "{}", str_from_utf8(escape_sequence)?)?;
+                        writer.write_all(escape_sequence)?;
                     }
                 }
             }
             0x00..=0x7f => {
-                let buf = [byte];
-                write!(writer, "{}", crate::FormatEscapes::double_quoted(&buf))?;
+                crate::fmt_escapes(writer, &[byte], Quotes::Double)?;
                 pos += 1;
             }
             0x80..=0xff => {
-                write!(writer, "{}", byte as char)?;
+                writer.write_all(&[byte])?;
                 pos += 1;
             }
         }
@@ -707,11 +704,22 @@ fn anything_between(tree: &Ast, start_token: TokenIndex, end_token: TokenIndex) 
 }
 
 fn write_fixing_whitespace(writer: &mut dyn Write, slice: &[u8]) -> Result<()> {
-    str_from_utf8(slice)?.chars().try_for_each(|c| match c {
-        '\t' => write!(writer, "    "),
-        '\r' => Ok(()),
-        _ => write!(writer, "{c}"),
-    })
+    let mut start = 0;
+    for (i, &byte) in slice.iter().enumerate() {
+        match byte {
+            b'\t' => {
+                writer.write_all(&slice[start..i])?;
+                write!(writer, "    ")?;
+                start = i + 1;
+            }
+            b'\r' => {
+                writer.write_all(&slice[start..i])?;
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    writer.write_all(&slice[start..])
 }
 
 fn node_is_block(tag: node::Tag) -> bool {
@@ -850,13 +858,17 @@ impl<'write> AutoIndentingStream<'write> {
 }
 
 impl Write for AutoIndentingStream<'_> {
-    fn write_str(&mut self, s: &str) -> Result<()> {
-        if s.is_empty() {
-            return Ok(());
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
         }
 
         self.apply_indent()?;
-        self.write_no_indent(s)
+        self.write_no_indent(buf)
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        self.underlying_writer.flush()
     }
 }
 
@@ -880,22 +892,23 @@ impl AutoIndentingStream<'_> {
         self.indent_delta = new_indent_delta;
     }
 
-    fn write_no_indent(&mut self, s: &str) -> Result<()> {
-        if s.is_empty() {
-            return Ok(());
+    fn write_no_indent(&mut self, bytes: &[u8]) -> Result<usize> {
+        if bytes.is_empty() {
+            return Ok(0);
         }
 
         if self.disabled_offset.is_none() {
-            self.underlying_writer.write_str(s)?;
+            self.underlying_writer.write_all(bytes)?;
         }
-        if s.as_bytes().last() == Some(&b'\n') {
+        if bytes.last() == Some(&b'\n') {
             self.reset_line();
         }
-        Ok(())
+        Ok(bytes.len())
     }
 
     fn insert_new_line(&mut self) -> Result<()> {
-        self.write_no_indent("\n")
+        self.write_no_indent(b"\n")?;
+        Ok(())
     }
 
     fn reset_line(&mut self) {
@@ -951,7 +964,7 @@ impl AutoIndentingStream<'_> {
         let current_indent = self.current_indent();
         if self.current_line_empty && current_indent > 0 {
             if self.disabled_offset.is_none() {
-                (0..current_indent).try_for_each(|_| self.underlying_writer.write_char(' '))?;
+                (0..current_indent).try_for_each(|_| write!(self.underlying_writer, " "))?;
             }
             self.applied_indent = current_indent;
         }
@@ -976,8 +989,4 @@ impl AutoIndentingStream<'_> {
         }
         0
     }
-}
-
-fn str_from_utf8(v: &[u8]) -> Result<&str> {
-    std::str::from_utf8(v).map_err(|_| Error)
 }

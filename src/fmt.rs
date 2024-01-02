@@ -1,26 +1,14 @@
-use std::fmt::{Display, Error, Formatter, Result, Write};
+use std::io::{Error, Result, Write};
 
 use crate::Token;
 
-pub struct FormatId<'a> {
-    bytes: &'a [u8],
-}
-
-impl<'a> FormatId<'a> {
-    pub fn new(bytes: &'a [u8]) -> Self {
-        Self { bytes }
+pub fn fmt_id(writer: &mut dyn Write, bytes: &[u8]) -> Result<()> {
+    if is_valid_id(bytes) {
+        return writer.write_all(bytes);
     }
-}
-
-impl Display for FormatId<'_> {
-    fn fmt(&self, f: &mut Formatter) -> Result {
-        if is_valid_id(self.bytes) {
-            return f.write_str(std::str::from_utf8(self.bytes).map_err(|_| Error)?);
-        }
-        f.write_str("@\"")?;
-        FormatEscapes::double_quoted(self.bytes).fmt(f)?;
-        f.write_char('"')
-    }
+    write!(writer, "@\"")?;
+    fmt_escapes(writer, bytes, Quotes::Double)?;
+    write!(writer, "\"")
 }
 
 pub fn is_valid_id(bytes: &[u8]) -> bool {
@@ -51,86 +39,66 @@ fn test_is_valid_id() {
     assert!(is_valid_id(b"i386"));
 }
 
-pub struct FormatEscapes<'a> {
-    bytes: &'a [u8],
-    single_quoted: bool,
+pub enum Quotes {
+    Single,
+    Double,
 }
 
-impl<'a> FormatEscapes<'a> {
-    pub fn double_quoted(bytes: &'a [u8]) -> Self {
-        Self {
-            bytes,
-            single_quoted: false,
-        }
-    }
-
-    pub fn single_quoted(bytes: &'a [u8]) -> Self {
-        Self {
-            bytes,
-            single_quoted: true,
-        }
-    }
-}
-
-impl Display for FormatEscapes<'_> {
-    fn fmt(&self, f: &mut Formatter) -> Result {
-        for &byte in self.bytes {
-            match byte {
-                b'\n' => f.write_str("\\n")?,
-                b'\r' => f.write_str("\\r")?,
-                b'\t' => f.write_str("\\t")?,
-                b'\\' => f.write_str("\\\\")?,
-                b'"' => {
-                    if self.single_quoted {
-                        f.write_char('"')?;
-                    } else {
-                        f.write_str("\\\"")?;
-                    }
-                }
-                b'\'' => {
-                    if self.single_quoted {
-                        f.write_str("\\'")?;
-                    } else {
-                        f.write_char('\'')?;
-                    }
-                }
-                b' ' | b'!' | b'#'..=b'&' | b'('..=b'[' | b']'..=b'~' => {
-                    f.write_char(byte as char)?;
-                }
-                // Use hex escapes for rest any unprintable characters.
-                _ => {
-                    f.write_str("\\x")?;
-                    write!(f, "{byte:02x}")?;
-                }
+pub fn fmt_escapes(writer: &mut dyn Write, bytes: &[u8], quotes: Quotes) -> Result<()> {
+    for &byte in bytes {
+        match byte {
+            b'\n' => write!(writer, "\\n")?,
+            b'\r' => write!(writer, "\\r")?,
+            b'\t' => write!(writer, "\\t")?,
+            b'\\' => write!(writer, "\\\\")?,
+            b'"' => match quotes {
+                Quotes::Single => write!(writer, "\"")?,
+                Quotes::Double => write!(writer, "\\\"")?,
+            },
+            b'\'' => match quotes {
+                Quotes::Single => write!(writer, "\\'")?,
+                Quotes::Double => write!(writer, "'")?,
+            },
+            b' ' | b'!' | b'#'..=b'&' | b'('..=b'[' | b']'..=b'~' => {
+                writer.write_all(&[byte])?;
             }
+            // Use hex escapes for rest any unprintable characters.
+            _ => write!(writer, "\\x{byte:02x}")?,
         }
-        Ok(())
     }
+    Ok(())
+}
+
+#[track_caller]
+fn assert_fmt_id(expected: &str, input: &str) {
+    let mut buffer = Vec::new();
+    fmt_id(&mut buffer, input.as_bytes()).unwrap();
+    assert_eq!(expected.as_bytes(), buffer.as_slice());
+}
+
+#[track_caller]
+fn assert_fmt_escapes(expected: &str, quotes: Quotes, input: &str) {
+    let mut buffer = Vec::new();
+    fmt_escapes(&mut buffer, input.as_bytes(), quotes).unwrap();
+    assert_eq!(expected.as_bytes(), buffer.as_slice());
 }
 
 #[test]
 fn test_escape_invalid_identifiers() {
-    assert_eq!("@\"while\"", format!("{}", FormatId::new(b"while")));
-    assert_eq!("hello", format!("{}", FormatId::new(b"hello")));
-    assert_eq!("@\"11\\\"23\"", format!("{}", FormatId::new(b"11\"23")));
-    assert_eq!("@\"11\\x0f23\"", format!("{}", FormatId::new(b"11\x0F23")));
+    assert_fmt_id("@\"while\"", "while");
+    assert_fmt_id("hello", "hello");
+    assert_fmt_id("@\"11\\\"23\"", "11\"23");
+    assert_fmt_id("@\"11\\x0f23\"", "11\x0F23");
 
-    assert_eq!(
-        "\\x0f",
-        format!("{}", FormatEscapes::double_quoted(b"\x0F"))
+    assert_fmt_escapes("\\x0f", Quotes::Double, "\x0F");
+    assert_fmt_escapes(
+        r#" \\ hi \x07 \x11 " derp \'"#,
+        Quotes::Single,
+        " \\ hi \x07 \x11 \" derp '",
     );
-    assert_eq!(
-        r#"" \\ hi \x07 \x11 " derp \'""#,
-        format!(
-            "\"{}\"",
-            FormatEscapes::single_quoted(b" \\ hi \x07 \x11 \" derp '")
-        )
-    );
-    assert_eq!(
-        r#"" \\ hi \x07 \x11 \" derp '""#,
-        format!(
-            "\"{}\"",
-            FormatEscapes::double_quoted(b" \\ hi \x07 \x11 \" derp '")
-        )
+    assert_fmt_escapes(
+        r#" \\ hi \x07 \x11 \" derp '"#,
+        Quotes::Double,
+        " \\ hi \x07 \x11 \" derp '",
     );
 }

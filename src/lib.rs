@@ -19,7 +19,7 @@ pub mod string_literal;
 pub use string_literal::parse_char_literal;
 
 pub mod fmt;
-pub use fmt::{is_valid_id, FormatEscapes, FormatId};
+pub use fmt::{fmt_escapes, fmt_id, is_valid_id};
 
 mod parse;
 mod utils;
