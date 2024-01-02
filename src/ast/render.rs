@@ -381,8 +381,8 @@ impl Render<'_, '_, '_> {
         space: Space,
         quote: QuoteBehavior,
     ) -> Result<()> {
-        todo!("render_identifier");
-        self.render_quoted_identifier::<true>(token_index, space)
+        todo!("render_identifier")
+        // self.render_quoted_identifier::<true>(token_index, space)
     }
 
     // Renders a @"" quoted identifier, normalizing escapes.
@@ -395,13 +395,13 @@ impl Render<'_, '_, '_> {
     ) -> Result<()> {
         debug_assert_eq!(self.tree.token_tag(token_index), T::Identifier);
         let lexeme = token_slice_for_render(self.tree, token_index);
-        let lexeme = lexeme.as_bytes();
-        debug_assert!(lexeme.len() >= 3 && lexeme[0] == b'@');
+        let [b'@', b'"', contents @ .., b'"'] = &lexeme[..] else {
+            unreachable!();
+        };
 
         if !UNQUOTE {
             write!(self.ais, "@\"")?;
         }
-        let contents = &lexeme[2..lexeme.len() - 1];
         render_identifier_contents(&mut self.ais, contents)?;
         if !UNQUOTE {
             write!(self.ais, "\"")?;
@@ -469,7 +469,7 @@ impl Render<'_, '_, '_> {
                 }
                 _ => {
                     // Write the comment minus trailing whitespace.
-                    write!(self.ais, "{}\n", String::from_utf8_lossy(trimmed_comment))?;
+                    write!(self.ais, "{}\n", str_from_utf8(trimmed_comment)?)?;
                 }
             }
         }
@@ -591,8 +591,11 @@ impl Render<'_, '_, '_> {
         for param in fn_proto.iterate(self.tree) {
             let name_ident = param.name_token.unwrap();
             debug_assert_eq!(self.tree.token_tag(name_ident), T::Identifier);
-            let s = token_slice_for_render(self.tree, name_ident);
-            write!(self.ais, "_ = {s};\n")?;
+            write!(
+                self.ais,
+                "_ = {};\n",
+                str_from_utf8(token_slice_for_render(self.tree, name_ident))?
+            )?;
         }
         Ok(())
     }
@@ -612,8 +615,9 @@ fn render_identifier_contents(writer: &mut dyn Write, bytes: &[u8]) -> Result<()
                         let buf = [codepoint as u8];
                         write!(writer, "{}", crate::FormatEscapes::double_quoted(&buf))?;
                     }
-                    _ => writer
-                        .write_str(std::str::from_utf8(escape_sequence).map_err(|_| Error)?)?,
+                    _ => {
+                        write!(writer, "{}", str_from_utf8(escape_sequence)?)?;
+                    }
                 }
             }
             0x00..=0x7f => {
@@ -622,7 +626,7 @@ fn render_identifier_contents(writer: &mut dyn Write, bytes: &[u8]) -> Result<()
                 pos += 1;
             }
             0x80..=0xff => {
-                writer.write_char(byte as char)?;
+                write!(writer, "{}", byte as char)?;
                 pos += 1;
             }
         }
@@ -657,7 +661,7 @@ fn has_multiline_string(tree: Ast, start_token: TokenIndex, end_token: TokenInde
     false
 }
 
-fn token_slice_for_render<'src>(tree: &Ast<'src>, token_index: TokenIndex) -> Cow<'src, str> {
+fn token_slice_for_render<'src>(tree: &Ast<'src>, token_index: TokenIndex) -> &'src [u8] {
     let mut ret = tree.token_slice(token_index);
     match tree.token_tag(token_index) {
         T::MultilineStringLiteralLine => match &ret[..] {
@@ -669,7 +673,7 @@ fn token_slice_for_render<'src>(tree: &Ast<'src>, token_index: TokenIndex) -> Co
         }
         _ => {}
     }
-    String::from_utf8_lossy(ret)
+    ret
 }
 
 fn has_same_line_comment(tree: &Ast, token_index: TokenIndex) -> bool {
@@ -703,11 +707,10 @@ fn anything_between(tree: &Ast, start_token: TokenIndex, end_token: TokenIndex) 
 }
 
 fn write_fixing_whitespace(writer: &mut dyn Write, slice: &[u8]) -> Result<()> {
-    let s = std::str::from_utf8(slice).map_err(|_| Error)?;
-    s.chars().try_for_each(|c| match c {
-        '\t' => writer.write_str("    "),
+    str_from_utf8(slice)?.chars().try_for_each(|c| match c {
+        '\t' => write!(writer, "    "),
         '\r' => Ok(()),
-        _ => writer.write_char(c),
+        _ => write!(writer, "{c}"),
     })
 }
 
@@ -973,4 +976,8 @@ impl AutoIndentingStream<'_> {
         }
         0
     }
+}
+
+fn str_from_utf8(v: &[u8]) -> Result<&str> {
+    std::str::from_utf8(v).map_err(|_| Error)
 }
