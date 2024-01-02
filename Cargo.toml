@@ -8,7 +8,3 @@ bitfield = "0.14.0"
 
 [dev-dependencies]
 test-with = { version = "0.12.2", default-features = false }
-
-[workspace]
-members = [".", "./zig-lsp"]
-default-members = ["."]
