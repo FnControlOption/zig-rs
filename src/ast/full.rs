@@ -1354,21 +1354,21 @@ impl<'src> Ast<'src> {
 }
 
 pub struct VarDecl {
-    visib_token: Option<TokenIndex>,
-    extern_export_token: Option<TokenIndex>,
-    lib_name: Option<TokenIndex>,
-    threadlocal_token: Option<TokenIndex>,
-    comptime_token: Option<TokenIndex>,
-    ast: VarDeclComponents,
+    pub visib_token: Option<TokenIndex>,
+    pub extern_export_token: Option<TokenIndex>,
+    pub lib_name: Option<TokenIndex>,
+    pub threadlocal_token: Option<TokenIndex>,
+    pub comptime_token: Option<TokenIndex>,
+    pub ast: VarDeclComponents,
 }
 
 pub struct VarDeclComponents {
-    mut_token: TokenIndex,
-    type_node: node::Index,
-    align_node: node::Index,
-    addrspace_node: node::Index,
-    section_node: node::Index,
-    init_node: node::Index,
+    pub mut_token: TokenIndex,
+    pub type_node: node::Index,
+    pub align_node: node::Index,
+    pub addrspace_node: node::Index,
+    pub section_node: node::Index,
+    pub init_node: node::Index,
 }
 
 impl VarDecl {
@@ -1384,66 +1384,66 @@ impl VarDecl {
 pub struct If {
     /// Points to the first token after the `|`. Will either be an identifier or
     /// a `*` (with an identifier immediately after it).
-    payload_token: Option<TokenIndex>,
+    pub payload_token: Option<TokenIndex>,
     /// Points to the identifier after the `|`.
-    error_token: Option<TokenIndex>,
+    pub error_token: Option<TokenIndex>,
     /// Populated only if else_expr != 0.
-    else_token: TokenIndex,
-    ast: IfComponents,
+    pub else_token: TokenIndex,
+    pub ast: IfComponents,
 }
 
 pub struct IfComponents {
-    if_token: TokenIndex,
-    cond_expr: node::Index,
-    then_expr: node::Index,
-    else_expr: node::Index,
+    pub if_token: TokenIndex,
+    pub cond_expr: node::Index,
+    pub then_expr: node::Index,
+    pub else_expr: node::Index,
 }
 
 pub struct While {
-    ast: WhileComponents,
-    inline_token: Option<TokenIndex>,
-    label_token: Option<TokenIndex>,
-    payload_token: Option<TokenIndex>,
-    error_token: Option<TokenIndex>,
+    pub ast: WhileComponents,
+    pub inline_token: Option<TokenIndex>,
+    pub label_token: Option<TokenIndex>,
+    pub payload_token: Option<TokenIndex>,
+    pub error_token: Option<TokenIndex>,
     /// Populated only if else_expr != 0.
-    else_token: TokenIndex,
+    pub else_token: TokenIndex,
 }
 
 pub struct WhileComponents {
-    while_token: TokenIndex,
-    cond_expr: node::Index,
-    cont_expr: node::Index,
-    then_expr: node::Index,
-    else_expr: node::Index,
+    pub while_token: TokenIndex,
+    pub cond_expr: node::Index,
+    pub cont_expr: node::Index,
+    pub then_expr: node::Index,
+    pub else_expr: node::Index,
 }
 
 pub struct For<'buf> {
-    ast: ForComponents<'buf>,
-    inline_token: Option<TokenIndex>,
-    label_token: Option<TokenIndex>,
-    payload_token: TokenIndex,
+    pub ast: ForComponents<'buf>,
+    pub inline_token: Option<TokenIndex>,
+    pub label_token: Option<TokenIndex>,
+    pub payload_token: TokenIndex,
     /// Populated only if else_expr != 0.
-    else_token: TokenIndex,
+    pub else_token: TokenIndex,
 }
 
 pub struct ForComponents<'buf> {
-    for_token: TokenIndex,
-    inputs: &'buf [node::Index],
-    then_expr: node::Index,
-    else_expr: node::Index,
+    pub for_token: TokenIndex,
+    pub inputs: &'buf [node::Index],
+    pub then_expr: node::Index,
+    pub else_expr: node::Index,
 }
 
 pub struct ContainerField {
-    comptime_token: Option<TokenIndex>,
-    ast: ContainerFieldComponents,
+    pub comptime_token: Option<TokenIndex>,
+    pub ast: ContainerFieldComponents,
 }
 
 pub struct ContainerFieldComponents {
-    main_token: TokenIndex,
-    type_expr: node::Index,
-    align_expr: node::Index,
-    value_expr: node::Index,
-    tuple_like: bool,
+    pub main_token: TokenIndex,
+    pub type_expr: node::Index,
+    pub align_expr: node::Index,
+    pub value_expr: node::Index,
+    pub tuple_like: bool,
 }
 
 impl ContainerField {
@@ -1470,39 +1470,39 @@ impl ContainerField {
 }
 
 pub struct FnProto<'buf> {
-    visib_token: Option<TokenIndex>,
-    extern_export_inline_token: Option<TokenIndex>,
-    lib_name: Option<TokenIndex>,
-    name_token: Option<TokenIndex>,
-    lparen: TokenIndex,
-    ast: FnProtoComponents<'buf>,
+    pub visib_token: Option<TokenIndex>,
+    pub extern_export_inline_token: Option<TokenIndex>,
+    pub lib_name: Option<TokenIndex>,
+    pub name_token: Option<TokenIndex>,
+    pub lparen: TokenIndex,
+    pub ast: FnProtoComponents<'buf>,
 }
 
 pub struct FnProtoComponents<'buf> {
-    proto_node: node::Index,
-    fn_token: TokenIndex,
-    return_type: node::Index,
-    params: &'buf [node::Index],
-    align_expr: node::Index,
-    addrspace_expr: node::Index,
-    section_expr: node::Index,
-    callconv_expr: node::Index,
+    pub proto_node: node::Index,
+    pub fn_token: TokenIndex,
+    pub return_type: node::Index,
+    pub params: &'buf [node::Index],
+    pub align_expr: node::Index,
+    pub addrspace_expr: node::Index,
+    pub section_expr: node::Index,
+    pub callconv_expr: node::Index,
 }
 
 pub struct FnParam {
-    first_doc_comment: Option<TokenIndex>,
-    name_token: Option<TokenIndex>,
-    comptime_noalias: Option<TokenIndex>,
-    anytype_ellipsis3: Option<TokenIndex>,
-    type_expr: node::Index,
+    pub first_doc_comment: Option<TokenIndex>,
+    pub name_token: Option<TokenIndex>,
+    pub comptime_noalias: Option<TokenIndex>,
+    pub anytype_ellipsis3: Option<TokenIndex>,
+    pub type_expr: node::Index,
 }
 
 pub struct FnParamIterator<'ast, 'src, 'fun, 'buf> {
-    tree: &'ast Ast<'src>,
-    fn_proto: &'fun FnProto<'buf>,
-    param_i: usize,
-    tok_i: TokenIndex,
-    tok_flag: bool,
+    pub tree: &'ast Ast<'src>,
+    pub fn_proto: &'fun FnProto<'buf>,
+    pub param_i: usize,
+    pub tok_i: TokenIndex,
+    pub tok_flag: bool,
 }
 
 impl Iterator for FnParamIterator<'_, '_, '_, '_> {
@@ -1615,34 +1615,34 @@ impl<'buf> FnProto<'buf> {
 }
 
 pub struct StructInit<'buf> {
-    ast: StructInitComponents<'buf>,
+    pub ast: StructInitComponents<'buf>,
 }
 
 pub struct StructInitComponents<'buf> {
-    lbrace: TokenIndex,
-    fields: &'buf [node::Index],
-    type_expr: node::Index,
+    pub lbrace: TokenIndex,
+    pub fields: &'buf [node::Index],
+    pub type_expr: node::Index,
 }
 
 pub struct ArrayInit<'buf> {
-    ast: ArrayInitComponents<'buf>,
+    pub ast: ArrayInitComponents<'buf>,
 }
 
 pub struct ArrayInitComponents<'buf> {
-    lbrace: TokenIndex,
-    elements: &'buf [node::Index],
-    type_expr: node::Index,
+    pub lbrace: TokenIndex,
+    pub elements: &'buf [node::Index],
+    pub type_expr: node::Index,
 }
 
 pub struct ArrayType {
-    ast: ArrayTypeComponents,
+    pub ast: ArrayTypeComponents,
 }
 
 pub struct ArrayTypeComponents {
-    lbracket: TokenIndex,
-    elem_count: node::Index,
-    sentinel: node::Index,
-    elem_type: node::Index,
+    pub lbracket: TokenIndex,
+    pub elem_count: node::Index,
+    pub sentinel: node::Index,
+    pub elem_type: node::Index,
 }
 
 pub enum PtrSize {
@@ -1653,85 +1653,85 @@ pub enum PtrSize {
 }
 
 pub struct PtrType {
-    size: PtrSize,
-    allowzero_token: Option<TokenIndex>,
-    const_token: Option<TokenIndex>,
-    volatile_token: Option<TokenIndex>,
-    ast: PtrTypeComponents,
+    pub size: PtrSize,
+    pub allowzero_token: Option<TokenIndex>,
+    pub const_token: Option<TokenIndex>,
+    pub volatile_token: Option<TokenIndex>,
+    pub ast: PtrTypeComponents,
 }
 
 pub struct PtrTypeComponents {
-    main_token: TokenIndex,
-    align_node: node::Index,
-    addrspace_node: node::Index,
-    sentinel: node::Index,
-    bit_range_start: node::Index,
-    bit_range_end: node::Index,
-    child_type: node::Index,
+    pub main_token: TokenIndex,
+    pub align_node: node::Index,
+    pub addrspace_node: node::Index,
+    pub sentinel: node::Index,
+    pub bit_range_start: node::Index,
+    pub bit_range_end: node::Index,
+    pub child_type: node::Index,
 }
 
 pub struct Slice {
-    ast: SliceComponents,
+    pub ast: SliceComponents,
 }
 
 pub struct SliceComponents {
-    sliced: node::Index,
-    lbracket: TokenIndex,
-    start: node::Index,
-    end: node::Index,
-    sentinel: node::Index,
+    pub sliced: node::Index,
+    pub lbracket: TokenIndex,
+    pub start: node::Index,
+    pub end: node::Index,
+    pub sentinel: node::Index,
 }
 
 pub struct ContainerDecl<'buf> {
-    layout_token: Option<TokenIndex>,
-    ast: ContainerDeclComponents<'buf>,
+    pub layout_token: Option<TokenIndex>,
+    pub ast: ContainerDeclComponents<'buf>,
 }
 
 pub struct ContainerDeclComponents<'buf> {
-    main_token: TokenIndex,
+    pub main_token: TokenIndex,
     /// Populated when main_token is Keyword_union.
-    enum_token: Option<TokenIndex>,
-    members: &'buf [node::Index],
-    arg: node::Index,
+    pub enum_token: Option<TokenIndex>,
+    pub members: &'buf [node::Index],
+    pub arg: node::Index,
 }
 
 pub struct SwitchCase<'buf> {
-    inline_token: Option<TokenIndex>,
+    pub inline_token: Option<TokenIndex>,
     /// Points to the first token after the `|`. Will either be an identifier or
     /// a `*` (with an identifier immediately after it).
-    payload_token: Option<TokenIndex>,
-    ast: SwitchCaseComponents<'buf>,
+    pub payload_token: Option<TokenIndex>,
+    pub ast: SwitchCaseComponents<'buf>,
 }
 
 pub struct SwitchCaseComponents<'buf> {
     /// If empty, this is an else case
-    values: &'buf [node::Index],
-    arrow_token: TokenIndex,
-    target_expr: node::Index,
+    pub values: &'buf [node::Index],
+    pub arrow_token: TokenIndex,
+    pub target_expr: node::Index,
 }
 
 pub struct Asm<'buf> {
-    ast: AsmComponents<'buf>,
-    volatile_token: Option<TokenIndex>,
-    first_clobber: Option<TokenIndex>,
-    outputs: &'buf [node::Index],
-    inputs: &'buf [node::Index],
+    pub ast: AsmComponents<'buf>,
+    pub volatile_token: Option<TokenIndex>,
+    pub first_clobber: Option<TokenIndex>,
+    pub outputs: &'buf [node::Index],
+    pub inputs: &'buf [node::Index],
 }
 
 pub struct AsmComponents<'buf> {
-    asm_token: TokenIndex,
-    template: node::Index,
-    items: &'buf [node::Index],
-    rparen: TokenIndex,
+    pub asm_token: TokenIndex,
+    pub template: node::Index,
+    pub items: &'buf [node::Index],
+    pub rparen: TokenIndex,
 }
 
 pub struct Call<'buf> {
-    ast: CallComponents<'buf>,
-    async_token: Option<TokenIndex>,
+    pub ast: CallComponents<'buf>,
+    pub async_token: Option<TokenIndex>,
 }
 
 pub struct CallComponents<'buf> {
-    lparen: TokenIndex,
-    fn_expr: node::Index,
-    params: &'buf [node::Index],
+    pub lparen: TokenIndex,
+    pub fn_expr: node::Index,
+    pub params: &'buf [node::Index],
 }

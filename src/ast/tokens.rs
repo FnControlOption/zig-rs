@@ -869,7 +869,7 @@ impl<'src> Ast<'src> {
         }
     }
 
-    pub fn tokens_on_same_line(&mut self, token1: TokenIndex, token2: TokenIndex) -> bool {
+    pub fn tokens_on_same_line(&self, token1: TokenIndex, token2: TokenIndex) -> bool {
         let source = self.source(self.token_start(token1)..self.token_start(token2));
         source.iter().all(|&b| b != b'\n')
     }

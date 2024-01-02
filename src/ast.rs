@@ -158,4 +158,5 @@ impl<'a> GetExtraData<'a, &'a [node::Index]> for Ast<'_> {
     }
 }
 
+pub(crate) const UNDEFINED_NODE: node::Index = node::Index::MAX;
 pub(crate) const UNDEFINED_TOKEN: TokenIndex = TokenIndex::MAX;

@@ -1,4 +1,5 @@
 use super::*;
+use crate::ascii;
 
 impl Parser<'_, '_> {
     pub(super) fn parse_type_expr(&mut self) -> Result<node::Index> {
@@ -131,7 +132,7 @@ impl Parser<'_, '_> {
                     if let Some(ident) = self.eat_token(T::Identifier) {
                         let ident_slice =
                             self.source(self.token_start(ident)..self.token_start(ident + 1));
-                        if trim_ascii_end(ident_slice) != b"c" {
+                        if ascii::trim_ascii_end(ident_slice) != b"c" {
                             self.tok_i -= 1;
                         }
                     } else if self.eat_token(T::Colon).is_some() {
@@ -970,16 +971,4 @@ impl Parser<'_, '_> {
             }
         }
     }
-}
-
-// https://github.com/rust-lang/rust/issues/94035
-const fn trim_ascii_end(mut bytes: &[u8]) -> &[u8] {
-    while let [rest @ .., last] = bytes {
-        if last.is_ascii_whitespace() {
-            bytes = rest;
-        } else {
-            break;
-        }
-    }
-    bytes
 }

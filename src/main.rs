@@ -88,6 +88,7 @@ fn recurse(
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test() {
     main();

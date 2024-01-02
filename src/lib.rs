@@ -15,4 +15,11 @@ pub use token::{Token, Tokenizer};
 pub mod ast;
 pub use ast::Ast;
 
+pub mod string_literal;
+pub use string_literal::parse_char_literal;
+
+pub mod fmt;
+pub use fmt::{is_valid_id, FormatEscapes, FormatId};
+
+mod ascii;
 mod parse;

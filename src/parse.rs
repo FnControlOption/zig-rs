@@ -267,4 +267,3 @@ impl<'src> Parser<'src, '_> {
 }
 
 const NULL_NODE: node::Index = 0;
-const UNDEFINED_NODE: node::Index = node::Index::MAX;
