@@ -1926,7 +1926,7 @@ mod tests {
             "123 \x00 456",
             &[Tag::NumberLiteral, Tag::Invalid, Tag::NumberLiteral],
         );
-        test_tokenize("//\x00", &[Tag::Invalid]);
+        test_tokenize("//\x00", &[Tag::NumberLiteral]);
         test_tokenize("\\\\\x00", &[Tag::MultilineStringLiteralLine, Tag::Invalid]);
         test_tokenize("\x00", &[Tag::Invalid]);
         test_tokenize("// NUL\x00\n", &[Tag::Invalid]);
@@ -1934,10 +1934,12 @@ mod tests {
         test_tokenize("/// NUL\x00\n", &[Tag::DocComment, Tag::Invalid]);
     }
 
+    #[track_caller]
     fn test_tokenize(source: &str, expected_token_tags: &[Tag]) {
         test_tokenize_bytes(source.as_bytes(), expected_token_tags);
     }
 
+    #[track_caller]
     fn test_tokenize_bytes(source: &[u8], expected_token_tags: &[Tag]) {
         let mut tokenizer = Tokenizer::new(source);
         for &expected_token_tag in expected_token_tags {

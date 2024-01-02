@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Error, Write};
 
 use super::*;
-use crate::{ascii, string_literal};
+use crate::{string_literal, utils};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -132,18 +132,15 @@ enum QuoteBehavior {
 impl Render<'_, '_, '_> {
     /// Render all members in the given slice, keeping empty lines where appropriate
     fn render_members(&mut self, members: &[node::Index]) -> Result<()> {
-        let Self { tree, .. } = self;
         let [first_member, remaining_members @ ..] = &members[..] else {
             return Ok(());
         };
-        let container = 'blk: {
-            for member in members {
-                if false {
-                    break 'blk Container::Other;
-                }
-            }
-            Container::Tuple
-        };
+        let container = members
+            .iter()
+            .filter_map(|&m| self.tree.full_container_field(m))
+            .all(|f| f.ast.tuple_like)
+            .then_some(Container::Tuple)
+            .unwrap_or(Container::Other);
         self.render_member(container, *first_member, Space::Newline)?;
         for member in remaining_members {
             self.render_extra_newline(*member)?;
@@ -384,38 +381,103 @@ impl Render<'_, '_, '_> {
         space: Space,
         quote: QuoteBehavior,
     ) -> Result<()> {
-        todo!("render_identifier")
+        todo!("render_identifier");
+        self.render_quoted_identifier::<true>(token_index, space)
     }
 
-    fn render_quoted_identifier(
+    // Renders a @"" quoted identifier, normalizing escapes.
+    // Unnecessary escapes are un-escaped, and \u escapes are normalized to \x when they fit.
+    // If unquote is true, the @"" is removed and the result is a bare symbol whose validity is asserted.
+    fn render_quoted_identifier<const UNQUOTE: bool>(
         &mut self,
         token_index: TokenIndex,
         space: Space,
-        /* TODO: comptime? */ unquote: bool,
     ) -> Result<()> {
-        todo!("render_quoted_identifier")
+        debug_assert_eq!(self.tree.token_tag(token_index), T::Identifier);
+        let lexeme = token_slice_for_render(self.tree, token_index);
+        let lexeme = lexeme.as_bytes();
+        debug_assert!(lexeme.len() >= 3 && lexeme[0] == b'@');
+
+        if !UNQUOTE {
+            write!(self.ais, "@\"")?;
+        }
+        let contents = &lexeme[2..lexeme.len() - 1];
+        render_identifier_contents(&mut self.ais, contents)?;
+        if !UNQUOTE {
+            write!(self.ais, "\"")?;
+        }
+
+        self.render_space(token_index, lexeme.len(), space)
     }
 
     /// Assumes that start is the first byte past the previous token and
     /// that end is the last byte before the next token.
     fn render_comments(&mut self, start: usize, end: usize) -> Result<bool> {
-        let Self { tree, ais, .. } = self;
-
         let mut index = start;
-        while let Some(offset) = tree.source[start..end].windows(2).position(|s| s == b"//") {
-            todo!("render_comments")
+        while let Some(offset) = utils::find(&self.tree.source[start..end], b"//") {
+            let comment_start = index + offset;
+
+            // If there is no newline, the comment ends with EOF
+            let newline_index = utils::find_scalar(&self.tree.source[comment_start..end], b'\n');
+            let newline = newline_index.map(|i| comment_start + i);
+
+            let untrimmed_comment = match newline {
+                Some(n) => &self.tree.source[comment_start..n],
+                None => &self.tree.source[comment_start..],
+            };
+            let trimmed_comment = utils::trim_ascii_end(untrimmed_comment);
+
+            // Don't leave any whitespace at the start of the file
+            if index != 0 {
+                if index == start
+                    && utils::contains_at_least(&self.tree.source[index..comment_start], 2, b"\n")
+                {
+                    // Leave up to one empty line before the first comment
+                    self.ais.insert_new_line()?;
+                    self.ais.insert_new_line()?;
+                } else if utils::contains(&self.tree.source[index..comment_start], b"\n") {
+                    // Respect the newline directly before the comment.
+                    // Note: This allows an empty line between comments
+                    self.ais.insert_new_line()?;
+                } else if index == start {
+                    // Otherwise if the first comment is on the same line as
+                    // the token before it, prefix it with a single space.
+                    write!(self.ais, " ")?;
+                }
+            }
+
+            index = match newline {
+                Some(n) => n + 1,
+                None => end,
+            };
+
+            let comment_content = utils::trim_ascii_start(&trimmed_comment["//".len()..]);
+            match self.ais.disabled_offset {
+                Some(disabled_offset) if comment_content == b"zig fmt: on" => {
+                    // Write the source for which formatting was disabled directly
+                    // to the underlying writer, fixing up invalid whitespace.
+                    let disabled_source = &self.tree.source[disabled_offset..comment_start];
+                    write_fixing_whitespace(self.ais.underlying_writer, disabled_source)?;
+                    // Write with the canonical single space.
+                    write!(self.ais.underlying_writer, "// zig fmt: on\n")?;
+                    self.ais.disabled_offset = None;
+                }
+                None if comment_content == b"zig fmt: off" => {
+                    // Write with the canonical single space.
+                    write!(self.ais, "// zig fmt: off\n")?;
+                    self.ais.disabled_offset = Some(index);
+                }
+                _ => {
+                    // Write the comment minus trailing whitespace.
+                    write!(self.ais, "{}\n", String::from_utf8_lossy(trimmed_comment))?;
+                }
+            }
         }
 
-        if index != start
-            && tree.source[index - 1..end]
-                .iter()
-                .filter(|&&b| b == b'\n')
-                .take(2)
-                .count()
-                == 2
-        {
-            if end != tree.source.len() {
-                ais.insert_new_line()?;
+        if index != start && utils::contains_at_least(&self.tree.source[index - 1..end], 2, b"\n") {
+            // Don't leave any whitespace at the end of the file
+            if end != self.tree.source.len() {
+                self.ais.insert_new_line()?;
             }
         }
 
@@ -428,8 +490,45 @@ impl Render<'_, '_, '_> {
 
     /// Check if there is an empty line immediately before the given token. If so, render it.
     fn render_extra_newline_token(&mut self, token_index: TokenIndex) -> Result<()> {
-        let token_start = self.tree.token_start(token_index);
-        todo!("render_extra_newline_token")
+        let token_start = self.tree.token_start(token_index) as usize;
+        if token_start == 0 {
+            return Ok(());
+        }
+        let prev_token_end = match token_index {
+            0 => 0,
+            _ => {
+                self.tree.token_start(token_index - 1) as usize
+                    + token_slice_for_render(self.tree, token_index - 1).len()
+            }
+        };
+
+        // If there is a immediately preceding comment or doc_comment,
+        // skip it because required extra newline has already been rendered.
+        if utils::contains(&self.tree.source[prev_token_end..token_start], b"//") {
+            return Ok(());
+        }
+        if token_index > 0 && self.tree.token_tag(token_index - 1) == T::DocComment {
+            return Ok(());
+        }
+
+        // Iterate backwards to the end of the previous token, stopping if a
+        // non-whitespace character is encountered or two newlines have been found.
+        let mut i = token_start - 1;
+        let mut newlines = 0;
+        while self.tree.source[i].is_ascii_whitespace() {
+            if self.tree.source[i] == b'\n' {
+                newlines += 1;
+            }
+            if newlines == 2 {
+                return self.ais.insert_new_line();
+            }
+            if i == prev_token_end {
+                break;
+            }
+            i -= 1;
+        }
+
+        Ok(())
     }
 
     /// end_token is the token one past the last doc comment token. This function
@@ -491,11 +590,11 @@ impl Render<'_, '_, '_> {
         let fn_proto = self.tree.full_fn_proto(&mut buf, fn_proto_node).unwrap();
         for param in fn_proto.iterate(self.tree) {
             let name_ident = param.name_token.unwrap();
-            assert_eq!(self.tree.token_tag(name_ident), T::Identifier);
+            debug_assert_eq!(self.tree.token_tag(name_ident), T::Identifier);
             let s = token_slice_for_render(self.tree, name_ident);
             write!(self.ais, "_ = {s};\n")?;
         }
-        todo!("discard_all_params")
+        Ok(())
     }
 }
 
@@ -566,7 +665,7 @@ fn token_slice_for_render<'src>(tree: &Ast<'src>, token_index: TokenIndex) -> Co
             _ => {}
         },
         T::ContainerDocComment | T::DocComment => {
-            ret = ascii::trim_ascii_end(ret);
+            ret = utils::trim_ascii_end(ret);
         }
         _ => {}
     }

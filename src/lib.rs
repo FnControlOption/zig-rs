@@ -21,5 +21,5 @@ pub use string_literal::parse_char_literal;
 pub mod fmt;
 pub use fmt::{is_valid_id, FormatEscapes, FormatId};
 
-mod ascii;
 mod parse;
+mod utils;

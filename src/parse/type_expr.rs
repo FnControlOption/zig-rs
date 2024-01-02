@@ -1,5 +1,5 @@
 use super::*;
-use crate::ascii;
+use crate::utils;
 
 impl Parser<'_, '_> {
     pub(super) fn parse_type_expr(&mut self) -> Result<node::Index> {
@@ -132,7 +132,7 @@ impl Parser<'_, '_> {
                     if let Some(ident) = self.eat_token(T::Identifier) {
                         let ident_slice =
                             self.source(self.token_start(ident)..self.token_start(ident + 1));
-                        if ascii::trim_ascii_end(ident_slice) != b"c" {
+                        if utils::trim_ascii_end(ident_slice) != b"c" {
                             self.tok_i -= 1;
                         }
                     } else if self.eat_token(T::Colon).is_some() {

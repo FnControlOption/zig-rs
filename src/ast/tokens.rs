@@ -1,4 +1,5 @@
 use super::*;
+use crate::utils;
 
 impl<'src> Ast<'src> {
     pub fn token_location(&self, start_offset: ByteOffset, token_index: TokenIndex) -> Location {
@@ -11,10 +12,7 @@ impl<'src> Ast<'src> {
         let token_start = self.token_start(token_index) as usize;
 
         // Scan by line until we go past the token start
-        while let Some(i) = self.source[loc.line_start..]
-            .iter()
-            .position(|&c| c == b'\n')
-        {
+        while let Some(i) = utils::find_scalar(&self.source[loc.line_start..], b'\n') {
             if i + loc.line_start >= token_start {
                 break; // Went past
             }
