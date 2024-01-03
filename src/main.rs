@@ -10,7 +10,7 @@ use zig::*;
 
 fn main() {
     let home = std::env::var("HOME").unwrap();
-    if true {
+    if false {
         let root = format!("{home}/Documents/zig");
         let dir = format!("{root}/lib/std");
         let dir = format!("{root}/src");
@@ -34,9 +34,11 @@ fn main() {
         }
     }
     let tree = run(filename, &source);
-    if tree.errors.is_empty() {
+    if false && tree.errors.is_empty() {
         print!("{}", tree.display());
     }
+    let bytes = tree.render().unwrap();
+    println!("{}", String::from_utf8_lossy(bytes.as_slice()));
 }
 
 fn run<'src>(filename: &str, source: &'src str) -> Ast<'src> {

@@ -21,5 +21,7 @@ pub use string_literal::parse_char_literal;
 pub mod fmt;
 pub use fmt::{fmt_escapes, fmt_id, is_valid_id};
 
+pub mod primitives;
+
 mod parse;
 mod utils;

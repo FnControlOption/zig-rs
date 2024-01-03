@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::OnceLock;
 
 pub struct Token {
     pub tag: Tag,
@@ -12,7 +11,7 @@ pub struct Loc {
     pub end: usize,
 }
 
-fn keywords() -> &'static HashMap<&'static [u8], Tag> {
+pub fn keywords() -> &'static HashMap<&'static [u8], Tag> {
     let entries = [
         ("addrspace", Tag::KeywordAddrspace),
         ("align", Tag::KeywordAlign),
@@ -65,9 +64,10 @@ fn keywords() -> &'static HashMap<&'static [u8], Tag> {
         ("while", Tag::KeywordWhile),
     ];
 
-    // TODO(zig-rs): use LazyLock after it is stabilized
-    static KEYWORDS: OnceLock<HashMap<&'static [u8], Tag>> = OnceLock::new();
-    KEYWORDS.get_or_init(|| {
+    // TODO(zig-rs): use phf, or LazyLock after it is stabilized
+    use std::sync::OnceLock;
+    static LOCK: OnceLock<HashMap<&'static [u8], Tag>> = OnceLock::new();
+    LOCK.get_or_init(|| {
         let mut map = HashMap::new();
         for (string, tag) in entries {
             map.insert(string.as_bytes(), tag);
@@ -1926,7 +1926,7 @@ mod tests {
             "123 \x00 456",
             &[Tag::NumberLiteral, Tag::Invalid, Tag::NumberLiteral],
         );
-        test_tokenize("//\x00", &[Tag::NumberLiteral]);
+        test_tokenize("//\x00", &[Tag::Invalid]);
         test_tokenize("\\\\\x00", &[Tag::MultilineStringLiteralLine, Tag::Invalid]);
         test_tokenize("\x00", &[Tag::Invalid]);
         test_tokenize("// NUL\x00\n", &[Tag::Invalid]);

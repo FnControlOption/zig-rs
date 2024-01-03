@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum Error {
     /// The character after backslash is missing or not recognized.
     InvalidEscapeCharacter(usize),
@@ -19,11 +20,11 @@ pub enum Error {
     InvalidCharacter(usize),
 }
 
-pub fn parse_char_literal(slice: &[u8]) -> Result<u32, Error> {
+pub fn parse_char_literal(slice: &[u8]) -> Result<char, Error> {
     todo!("parse_char_literal")
 }
 
-pub fn parse_escape_sequence(slice: &[u8], offset: &mut usize) -> Result<u32, Error> {
+pub fn parse_escape_sequence(slice: &[u8], offset: &mut usize) -> Result<char, Error> {
     debug_assert!(slice.len() > *offset);
     debug_assert_eq!(slice[*offset], b'\\');
 
@@ -33,12 +34,12 @@ pub fn parse_escape_sequence(slice: &[u8], offset: &mut usize) -> Result<u32, Er
 
     *offset += 2;
     match slice[*offset - 1] {
-        b'n' => return Ok('\n' as u32),
-        b'r' => return Ok('\r' as u32),
-        b'\\' => return Ok('\\' as u32),
-        b't' => return Ok('\t' as u32),
-        b'\'' => return Ok('\'' as u32),
-        b'"' => return Ok('"' as u32),
+        b'n' => return Ok('\n'),
+        b'r' => return Ok('\r'),
+        b'\\' => return Ok('\\'),
+        b't' => return Ok('\t'),
+        b'\'' => return Ok('\''),
+        b'"' => return Ok('"'),
         b'x' => {
             let mut value: u8 = 0;
             let end: usize = *offset + 2;
@@ -67,7 +68,7 @@ pub fn parse_escape_sequence(slice: &[u8], offset: &mut usize) -> Result<u32, Er
                 }
             }
             *offset = end;
-            return Ok(value as u32);
+            return Ok(value as char);
         }
         b'u' => {
             let mut start = *offset;
@@ -101,7 +102,7 @@ pub fn parse_escape_sequence(slice: &[u8], offset: &mut usize) -> Result<u32, Er
                     }
                     b'}' => {
                         *offset = i + 1;
-                        return Ok(value);
+                        return char::from_u32(value).ok_or(Error::InvalidUnicodeCodepoint(i));
                     }
                     _ => {
                         return Err(Error::ExpectedHexDigitOrRBrace(i));

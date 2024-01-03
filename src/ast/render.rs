@@ -4,7 +4,7 @@ use std::io::{Error, ErrorKind, Result, Write};
 
 use super::*;
 use crate::fmt::Quotes;
-use crate::{string_literal, utils};
+use crate::{primitives, string_literal, utils};
 
 impl Ast<'_> {
     pub fn render(&self) -> Result<Vec<u8>> {
@@ -26,11 +26,11 @@ pub struct Fixups {
     unused_var_decls: HashSet<TokenIndex>,
     gut_functions: HashSet<node::Index>,
     omit_nodes: HashSet<node::Index>,
-    replace_nodes_with_string: HashMap<node::Index, String>,
-    append_string_after_node: HashMap<node::Index, String>,
+    replace_nodes_with_string: HashMap<node::Index, Vec<u8>>,
+    append_string_after_node: HashMap<node::Index, Vec<u8>>,
     replace_nodes_with_node: HashMap<node::Index, node::Index>,
-    rename_identifiers: HashMap<String, String>,
-    rebase_imported_paths: Option<String>,
+    rename_identifiers: HashMap<Vec<u8>, Vec<u8>>,
+    rebase_imported_paths: Option<Vec<u8>>,
 }
 
 impl Fixups {
@@ -154,7 +154,20 @@ impl Render<'_, '_, '_> {
         decl: node::Index,
         space: Space,
     ) -> Result<()> {
-        todo!("render_member")
+        if self.fixups.omit_nodes.contains(&decl) {
+            return Ok(());
+        }
+        self.render_doc_comments(self.tree.first_token(decl))?;
+        match self.tree.node(decl).tag {
+            N::GlobalVarDecl | N::LocalVarDecl | N::SimpleVarDecl | N::AlignedVarDecl => {
+                let var_decl = self.tree.full_var_decl(decl).unwrap();
+                self.render_var_decl(var_decl, false, Space::Semicolon)
+            }
+            _ => {
+                println!("render_member: {:?}", self.tree.node(decl).tag);
+                std::process::exit(1)
+            }
+        }
     }
 
     /// Render all expressions in the slice, keeping empty lines where appropriate
@@ -205,7 +218,15 @@ impl Render<'_, '_, '_> {
         // `comma_space` and `space` are used for destructure LHS decls.
         space: Space,
     ) -> Result<()> {
-        todo!("render_var_decl")
+        let name_token = var_decl.ast.mut_token + 1;
+        self.render_var_decl_without_fixups(var_decl, ignore_comptime_token, space)?;
+        if self.fixups.unused_var_decls.contains(&name_token) {
+            let ais = &mut self.ais;
+            write!(ais, "_ = ")?;
+            ais.write_all(token_slice_for_render(self.tree, name_token))?;
+            write!(ais, ";\n")?;
+        }
+        Ok(())
     }
 
     fn render_var_decl_without_fixups(
@@ -371,7 +392,15 @@ impl Render<'_, '_, '_> {
     }
 
     fn render_only_space(&mut self, space: Space) -> Result<()> {
-        todo!("render_only_space")
+        match space {
+            Space::None => Ok(()),
+            Space::Space => write!(self.ais, " "),
+            Space::Newline => self.ais.insert_new_line(),
+            Space::Comma => write!(self.ais, ",\n"),
+            Space::CommaSpace => write!(self.ais, ", "),
+            Space::Semicolon => write!(self.ais, ";\n"),
+            Space::Skip => unreachable!(),
+        }
     }
 
     fn render_identifier(
@@ -380,8 +409,128 @@ impl Render<'_, '_, '_> {
         space: Space,
         quote: QuoteBehavior,
     ) -> Result<()> {
-        todo!("render_identifier")
-        // self.render_quoted_identifier::<true>(token_index, space)
+        debug_assert_eq!(self.tree.token_tag(token_index), T::Identifier);
+        let lexeme = token_slice_for_render(self.tree, token_index);
+
+        if let Some(mangled) = self.fixups.rename_identifiers.get(lexeme) {
+            self.ais.write_all(mangled.as_slice())?;
+            return self.render_space(token_index, lexeme.len(), space);
+        }
+
+        if lexeme[0] != b'@' {
+            return self.render_token(token_index, space);
+        }
+
+        let [b'@', b'"', contents @ .., b'"'] = &lexeme[..] else {
+            unreachable!();
+        };
+
+        // Empty name can't be unquoted.
+        if contents.is_empty() {
+            return self.render_quoted_identifier::<false>(token_index, space);
+        }
+
+        // Special case for _ which would incorrectly be rejected by isValidId below.
+        if contents == b"_" {
+            match quote {
+                QuoteBehavior::EagerlyUnquote => {
+                    return self.render_quoted_identifier::<true>(token_index, space);
+                }
+                QuoteBehavior::EagerlyUnquoteExceptUnderscore
+                | QuoteBehavior::PreserveWhenShadowing => {
+                    return self.render_quoted_identifier::<false>(token_index, space);
+                }
+            }
+        }
+
+        // Scan the entire name for characters that would (after un-escaping) be illegal in a symbol,
+        // i.e. contents don't match: [A-Za-z_][A-Za-z0-9_]*
+        let mut contents_i: usize = 0;
+        while contents_i < contents.len() {
+            match contents[contents_i] {
+                b'0'..=b'9' => {
+                    if contents_i == 0 {
+                        return self.render_quoted_identifier::<false>(token_index, space);
+                    }
+                }
+                b'A'..=b'Z' | b'a'..=b'z' | b'_' => {}
+                b'\\' => {
+                    let mut esc_offset = contents_i;
+                    let res = string_literal::parse_escape_sequence(contents, &mut esc_offset);
+                    match res {
+                        Ok(char) => match char {
+                            '0'..='9' => {
+                                if contents_i == 0 {
+                                    return self
+                                        .render_quoted_identifier::<false>(token_index, space);
+                                }
+                            }
+                            'A'..='Z' | 'a'..='z' | '_' => {}
+                            _ => return self.render_quoted_identifier::<false>(token_index, space),
+                        },
+                        Err(_) => {
+                            return self.render_quoted_identifier::<false>(token_index, space)
+                        }
+                    }
+                    contents_i += esc_offset;
+                    continue;
+                }
+                _ => return self.render_quoted_identifier::<false>(token_index, space),
+            }
+            contents_i += 1;
+        }
+
+        // Read enough of the name (while un-escaping) to determine if it's a keyword or primitive.
+        // If it's too long to fit in this buffer, we know it's neither and quoting is unnecessary.
+        // If we read the whole thing, we have to do further checks.
+        fn longest_keyword_or_primitive_len() -> usize {
+            // TODO(zig-rs): use LazyLock after it is stabilized
+            use std::sync::OnceLock;
+            static LOCK: OnceLock<usize> = OnceLock::new();
+            *LOCK.get_or_init(|| {
+                primitives::names()
+                    .iter()
+                    .chain(token::keywords().keys())
+                    .map(|s| s.len())
+                    .max()
+                    .unwrap_or(0)
+            })
+        }
+        let mut buf = vec![u8::MAX; longest_keyword_or_primitive_len()];
+
+        contents_i = 0;
+        let mut buf_i: usize = 0;
+        while contents_i < contents.len() && buf_i < longest_keyword_or_primitive_len() {
+            if contents[contents_i] == b'\\' {
+                let res = string_literal::parse_escape_sequence(contents, &mut contents_i).unwrap();
+                buf[buf_i] = res as u8;
+                buf_i += 1;
+            } else {
+                buf[buf_i] = contents[contents_i];
+                contents_i += 1;
+                buf_i += 1;
+            }
+        }
+
+        // We read the whole thing, so it could be a keyword or primitive.
+        if contents_i == contents.len() {
+            if crate::is_valid_id(&buf[0..buf_i]) {
+                return self.render_quoted_identifier::<false>(token_index, space);
+            }
+            if primitives::is_primitive(&buf[0..buf_i]) {
+                match quote {
+                    QuoteBehavior::EagerlyUnquote
+                    | QuoteBehavior::EagerlyUnquoteExceptUnderscore => {
+                        return self.render_quoted_identifier::<true>(token_index, space);
+                    }
+                    QuoteBehavior::PreserveWhenShadowing => {
+                        return self.render_quoted_identifier::<false>(token_index, space);
+                    }
+                }
+            }
+        }
+
+        self.render_quoted_identifier::<true>(token_index, space)
     }
 
     // Renders a @"" quoted identifier, normalizing escapes.
@@ -591,10 +740,10 @@ impl Render<'_, '_, '_> {
         for param in fn_proto.iterate(self.tree) {
             let name_ident = param.name_token.unwrap();
             debug_assert_eq!(self.tree.token_tag(name_ident), T::Identifier);
-            write!(self.ais, "_ = ")?;
-            self.ais
-                .write_all(token_slice_for_render(self.tree, name_ident))?;
-            write!(self.ais, "\n")?;
+            let ais = &mut self.ais;
+            write!(ais, "_ = ")?;
+            ais.write_all(token_slice_for_render(self.tree, name_ident))?;
+            write!(ais, ";\n")?;
         }
         Ok(())
     }
@@ -610,7 +759,7 @@ fn render_identifier_contents(writer: &mut dyn Write, bytes: &[u8]) -> Result<()
                 let res = string_literal::parse_escape_sequence(bytes, &mut pos);
                 let escape_sequence = &bytes[old_pos..pos];
                 match res {
-                    Ok(codepoint) if codepoint <= 0x7f => {
+                    Ok(codepoint) if codepoint.is_ascii() => {
                         crate::fmt_escapes(writer, &[codepoint as u8], Quotes::Double)?;
                     }
                     _ => {

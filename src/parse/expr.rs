@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::OnceLock;
 
 use super::*;
 
@@ -96,9 +95,10 @@ impl Parser<'_, '_> {
         ];
 
         pub(super) fn oper_table() -> &'static HashMap<token::Tag, OperInfo> {
-            // TODO(zig-rs): use LazyLock after it is stabilized
-            static OPER_TABLE: OnceLock<HashMap<token::Tag, OperInfo>> = OnceLock::new();
-            OPER_TABLE.get_or_init(|| {
+            // TODO(zig-rs): use phf, or LazyLock after it is stabilized
+            use std::sync::OnceLock;
+            static LOCK: OnceLock<HashMap<token::Tag, OperInfo>> = OnceLock::new();
+            LOCK.get_or_init(|| {
                 let mut map = HashMap::with_capacity(ENTRIES.len());
                 for (tag, info) in ENTRIES {
                     map.insert(tag, info);
