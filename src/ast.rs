@@ -1,10 +1,12 @@
+use std::borrow::Cow;
+
 use crate::ast::error::Tag as E;
 use crate::ast::node::Tag as N;
 use crate::parse::Parser;
 use crate::token::Tag as T;
 use crate::{token, Tokenizer};
 
-pub mod display;
+mod debug;
 pub mod error;
 pub mod full;
 pub mod node;
@@ -14,7 +16,6 @@ mod tests;
 mod tokens;
 pub mod visitor;
 
-pub use display::Display;
 pub use error::Error;
 use node::ExtraData;
 pub use node::Node;
@@ -43,7 +44,7 @@ pub enum Mode {
 /// index of the main expression.
 pub struct Ast<'src> {
     /// Reference to externally-owned data.
-    pub source: &'src [u8],
+    pub source: Cow<'src, [u8]>,
 
     pub token_tags: Vec<token::Tag>,
     pub token_starts: Vec<ByteOffset>,
@@ -57,7 +58,7 @@ pub struct Ast<'src> {
 }
 
 impl<'src> Ast<'src> {
-    pub fn source(&self, range: std::ops::Range<ByteOffset>) -> &'src [u8] {
+    pub fn source(&self, range: std::ops::Range<ByteOffset>) -> &[u8] {
         &self.source[range.start as usize..range.end as usize]
     }
     pub fn token_tag(&self, index: TokenIndex) -> token::Tag {
@@ -113,7 +114,7 @@ impl<'src> Ast<'src> {
         } = parser;
 
         Self {
-            source,
+            source: Cow::from(source),
             mode,
             token_tags,
             token_starts,
@@ -130,7 +131,7 @@ impl<'src> Ast<'src> {
         &self.extra_data[start..end]
     }
 
-    pub fn get_node_source(&self, node: node::Index) -> &'src [u8] {
+    pub fn get_node_source(&self, node: node::Index) -> &[u8] {
         let first_token = self.first_token(node);
         let last_token = self.last_token(node);
         let start = self.token_start(first_token) as usize;

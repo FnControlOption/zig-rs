@@ -221,10 +221,11 @@ impl Render<'_, '_, '_> {
         let name_token = var_decl.ast.mut_token + 1;
         self.render_var_decl_without_fixups(var_decl, ignore_comptime_token, space)?;
         if self.fixups.unused_var_decls.contains(&name_token) {
-            let ais = &mut self.ais;
-            write!(ais, "_ = ")?;
-            ais.write_all(token_slice_for_render(self.tree, name_token))?;
-            write!(ais, ";\n")?;
+            // Discard the variable like this: `_ = foo;`
+            let w = &mut self.ais;
+            write!(w, "_ = ")?;
+            w.write_all(token_slice_for_render(self.tree, name_token))?;
+            write!(w, ";\n")?;
         }
         Ok(())
     }
@@ -740,10 +741,10 @@ impl Render<'_, '_, '_> {
         for param in fn_proto.iterate(self.tree) {
             let name_ident = param.name_token.unwrap();
             debug_assert_eq!(self.tree.token_tag(name_ident), T::Identifier);
-            let ais = &mut self.ais;
-            write!(ais, "_ = ")?;
-            ais.write_all(token_slice_for_render(self.tree, name_ident))?;
-            write!(ais, ";\n")?;
+            let w = &mut self.ais;
+            write!(w, "_ = ")?;
+            w.write_all(token_slice_for_render(self.tree, name_ident))?;
+            write!(w, ";\n")?;
         }
         Ok(())
     }
@@ -807,7 +808,7 @@ fn has_multiline_string(tree: Ast, start_token: TokenIndex, end_token: TokenInde
     false
 }
 
-fn token_slice_for_render<'src>(tree: &Ast<'src>, token_index: TokenIndex) -> &'src [u8] {
+fn token_slice_for_render<'a>(tree: &'a Ast, token_index: TokenIndex) -> &'a [u8] {
     let mut ret = tree.token_slice(token_index);
     match tree.token_tag(token_index) {
         T::MultilineStringLiteralLine => match &ret[..] {

@@ -40,7 +40,7 @@ impl<'src> Ast<'src> {
         loc
     }
 
-    pub fn token_slice(&self, token_index: TokenIndex) -> &'src [u8] {
+    pub fn token_slice(&self, token_index: TokenIndex) -> &[u8] {
         let token_tag = self.token_tag(token_index);
 
         if let Some(lexeme) = token_tag.lexeme() {
@@ -48,7 +48,7 @@ impl<'src> Ast<'src> {
         }
 
         let mut tokenizer = Tokenizer {
-            buffer: self.source,
+            buffer: &self.source,
             index: self.token_start(token_index) as usize,
             pending_invalid_token: None,
         };

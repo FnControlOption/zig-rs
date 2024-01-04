@@ -61,7 +61,7 @@ fn parse_recoverable(source: &str, mode: Mode) -> Ast {
         println!();
         println!("{}", std::panic::Location::caller());
         println!("{source}");
-        print!("{}", tree.display());
+        print!("{tree:?}");
     }
     tree
 }

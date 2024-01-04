@@ -35,7 +35,7 @@ fn main() {
     }
     let tree = run(filename, &source);
     if false && tree.errors.is_empty() {
-        print!("{}", tree.display());
+        print!("{tree:?}");
     }
     let bytes = tree.render().unwrap();
     println!("{}", String::from_utf8_lossy(bytes.as_slice()));
@@ -46,7 +46,7 @@ fn run<'src>(filename: &str, source: &'src str) -> Ast<'src> {
     for error in tree.errors.iter() {
         println!("{}", error.display(filename, &tree));
     }
-    format!("{}", tree.display());
+    format!("{tree:?}");
     tree
 }
 

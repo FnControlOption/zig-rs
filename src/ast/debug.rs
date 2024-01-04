@@ -1,29 +1,9 @@
 use super::*;
 
-impl Ast<'_> {
-    pub fn display(&self) -> Display {
-        Display::new(self)
-    }
-}
-
-pub struct Display<'a, 'b> {
-    pub tree: &'a Ast<'b>,
-    pub node: &'a Node,
-}
-
-impl<'a, 'b> Display<'a, 'b> {
-    pub fn new(tree: &'a Ast<'b>) -> Self {
-        Self {
-            tree,
-            node: tree.node(0),
-        }
-    }
-}
-
-impl std::fmt::Display for Display<'_, '_> {
+impl std::fmt::Debug for Ast<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut visitor = DumpVisitor::new();
-        visitor.accept(self.tree, self.node);
+        visitor.accept(self, self.node(0));
         visitor.finish().dump(f)
     }
 }

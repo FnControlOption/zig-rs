@@ -5,6 +5,7 @@
 #![allow(unused_mut)]
 #![allow(unused_variables)]
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -12,6 +13,9 @@ use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
+use zig::Ast;
+
+mod offsets;
 
 #[tokio::main]
 async fn main() {
@@ -25,6 +29,8 @@ async fn main() {
 #[derive(Debug)]
 struct Backend {
     client: Client,
+    encoding: Arc<RwLock<PositionEncodingKind>>,
+    ast_map: Arc<RwLock<HashMap<Url, Ast<'static>>>>,
     semantic_tokens_map: Arc<RwLock<HashMap<Url, Vec<SemanticToken>>>>,
 }
 
@@ -32,6 +38,8 @@ impl Backend {
     fn new(client: Client) -> Backend {
         Backend {
             client,
+            encoding: Arc::new(RwLock::new(PositionEncodingKind::UTF16)),
+            ast_map: Arc::new(RwLock::new(HashMap::new())),
             semantic_tokens_map: Arc::new(RwLock::new(HashMap::new())),
         }
     }
@@ -58,13 +66,15 @@ mod semantic_tokens {
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
+        // params.capabilities.general.map(|g| g.position_encodings)
+        let position_encoding = self.encoding.read().await;
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
-                position_encoding: None, // TODO: handle position encoding
+                position_encoding: Some(position_encoding.to_owned()),
                 text_document_sync: Some(TextDocumentSyncKind::FULL.into()),
                 // document_symbol_provider: Some(OneOf::Left(true)),
                 // folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
-                // completion_provider: Some(CompletionOptions::default()),
+                completion_provider: Some(CompletionOptions::default()),
                 semantic_tokens_provider: Some(
                     SemanticTokensServerCapabilities::SemanticTokensOptions(
                         SemanticTokensOptions {
@@ -77,6 +87,7 @@ impl LanguageServer for Backend {
                         },
                     ),
                 ),
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
                 ..Default::default()
             },
             server_info: None,
@@ -139,35 +150,99 @@ impl LanguageServer for Backend {
             })
         }))
     }
+
+    async fn completion(&self, _: CompletionParams) -> Result<Option<CompletionResponse>> {
+        Ok(Some(CompletionResponse::Array(vec![
+            CompletionItem::new_simple("Hello".to_string(), "Some detail".to_string()),
+            CompletionItem::new_simple("Bye".to_string(), "More detail".to_string()),
+        ])))
+    }
+
+    async fn hover(
+        &self,
+        HoverParams {
+            text_document_position_params:
+                TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position,
+                },
+            work_done_progress_params,
+        }: HoverParams,
+    ) -> Result<Option<Hover>> {
+        let ast_map = self.ast_map.read().await;
+        let Some(tree) = ast_map.get(&uri) else {
+            return Ok(None);
+        };
+
+        let index = {
+            let encoding = self.encoding.read().await;
+            offsets::position_to_index(&tree.source, position, &encoding)
+        };
+
+        let token_index = offsets::source_index_to_token_index(tree, index);
+
+        Ok(Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: format!(
+                    "## You're hovering!\n{:?}",
+                    String::from_utf8_lossy(tree.token_slice(token_index))
+                ),
+            }),
+            range: None,
+        }))
+    }
 }
 
 impl Backend {
     async fn parse_text(&self, uri: Url, version: i32, text: &str) {
-        let tree = zig::Ast::parse(text.as_bytes(), zig::ast::Mode::Zig);
-
-        let semantic_tokens = self.get_semantic_tokens(&tree);
         {
+            let tree = zig::Ast::parse(text.as_bytes(), zig::ast::Mode::Zig);
+            let mut map = self.ast_map.write().await;
+            map.insert(
+                uri.clone(),
+                zig::Ast {
+                    source: Cow::from(tree.source.into_owned()),
+                    ..tree
+                },
+            );
+        }
+
+        let ast_map = self.ast_map.read().await;
+        let tree = ast_map.get(&uri).unwrap();
+
+        {
+            let semantic_tokens = self.get_semantic_tokens(&tree);
             let mut map = self.semantic_tokens_map.write().await;
             map.insert(uri.clone(), semantic_tokens);
         }
 
-        let diags = get_diagnostics(&uri, &tree);
-        self.client
-            .publish_diagnostics(uri.clone(), diags, Some(version))
-            .await;
+        {
+            let encoding = self.encoding.read().await;
+            let diags = get_diagnostics(&uri, &tree, &encoding);
+            self.client
+                .publish_diagnostics(uri.clone(), diags, Some(version))
+                .await;
+        }
     }
 }
 
-fn get_diagnostics(uri: &Url, tree: &zig::Ast<'_>) -> Vec<Diagnostic> {
+fn get_diagnostics(
+    uri: &Url,
+    tree: &zig::Ast<'_>,
+    encoding: &PositionEncodingKind,
+) -> Vec<Diagnostic> {
     let mut diags = Vec::with_capacity(tree.errors.len());
     let mut related_info = Vec::with_capacity(2);
 
     for error in tree.errors.iter().rev() {
-        let loc = tree.token_location(0, error.token);
-        let line = loc.line as u32;
-        let character = loc.column as u32 + tree.error_offset(error);
-        let start = Position { line, character };
-        let range = Range { start, end: start };
+        let start = offsets::offset_to_position(
+            tree.source.as_ref(),
+            tree.token_start(error.token),
+            encoding,
+        );
+        let end = start; // TODO: get token end
+        let range = Range { start, end };
         let message = tree.render_error(error).into_owned();
 
         if error.is_note {
