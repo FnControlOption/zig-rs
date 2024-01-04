@@ -15,6 +15,7 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 use zig::Ast;
 
+mod analysis;
 mod offsets;
 
 #[tokio::main]
@@ -174,18 +175,20 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        let index = {
+        let source_index = {
             let encoding = self.encoding.read().await;
             offsets::position_to_index(&tree.source, position, &encoding)
         };
 
-        let token_index = offsets::source_index_to_token_index(tree, index);
+        let token_index = offsets::source_index_to_token_index(tree, source_index);
+
+        let pos_context = analysis::get_position_context(&tree.source, source_index, true);
 
         Ok(Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::Markdown,
                 value: format!(
-                    "## You're hovering!\n{:?}",
+                    "## You're hovering!\n{:?} {pos_context:?}",
                     String::from_utf8_lossy(tree.token_slice(token_index))
                 ),
             }),

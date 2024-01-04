@@ -1,6 +1,5 @@
-// based on https://github.com/zigtools/zls/blob/master/src/offsets.zig
-
 use zig::ast::{ByteOffset, TokenIndex};
+pub use zig::token::Loc;
 
 use super::*;
 
@@ -127,4 +126,30 @@ pub fn source_index_to_token_index(tree: &Ast, source_index: usize) -> TokenInde
     }
 
     upper_index as TokenIndex
+}
+
+pub fn line_loc_at_index(text: &[u8], index: usize) -> Loc {
+    let start = text[..index]
+        .iter()
+        .rposition(|&c| c == b'\n')
+        .map_or(0, |idx| idx + 1);
+    let end = text[index..]
+        .iter()
+        .position(|&c| c == b'\n')
+        .map_or(text.len(), |pos| index + pos);
+
+    Loc { start, end }
+}
+
+pub fn line_loc_until_index(text: &[u8], index: usize) -> Loc {
+    let start = text[..index]
+        .iter()
+        .rposition(|&c| c == b'\n')
+        .map_or(0, |idx| idx + 1);
+
+    Loc { start, end: index }
+}
+
+pub fn loc_to_slice<'a>(text: &'a [u8], loc: &Loc) -> &'a [u8] {
+    &text[loc.start..loc.end]
 }

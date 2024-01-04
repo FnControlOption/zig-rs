@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+#[derive(Clone, Debug)]
 pub struct Token {
     pub tag: Tag,
     pub loc: Loc,
 }
 
+#[derive(Clone, Debug)]
 pub struct Loc {
     pub start: usize,
     pub end: usize,
