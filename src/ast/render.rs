@@ -787,9 +787,9 @@ fn render_identifier_contents(writer: &mut dyn Write, bytes: &[u8]) -> Result<()
 /// there is none in the source.
 fn has_comment(tree: Ast, start_token: TokenIndex, end_token: TokenIndex) -> bool {
     for i in start_token..end_token {
-        let start = tree.token_start(i) as usize + tree.token_slice(i).len();
-        let end = tree.token_start(i + 1) as usize;
-        if tree.source[start..end].windows(2).any(|s| s == b"//") {
+        let start = tree.token_start(i) + tree.token_len(i);
+        let end = tree.token_start(i + 1);
+        if tree.source(start..end).windows(2).any(|s| s == b"//") {
             return true;
         }
     }

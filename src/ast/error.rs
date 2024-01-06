@@ -5,9 +5,9 @@ use super::*;
 impl Ast<'_> {
     /// Returns an extra offset for column and byte offset of errors that
     /// should point after the token in the error message.
-    pub fn error_offset(&self, parse_error: &Error) -> u32 {
+    pub fn error_offset(&self, parse_error: &Error) -> usize {
         if parse_error.token_is_prev {
-            self.token_slice(parse_error.token).len() as u32
+            self.token_slice(parse_error.token).len()
         } else {
             0
         }
@@ -339,7 +339,7 @@ impl std::fmt::Display for Display<'_, '_, '_, '_> {
         let filename = self.filename;
         let loc = self.tree.token_location(0, self.error.token);
         let line = loc.line + 1;
-        let column = loc.column + 1 + self.tree.error_offset(self.error) as usize;
+        let column = loc.column + 1 + self.tree.error_offset(self.error);
         let message = self.tree.render_error(self.error);
         write!(f, "{filename}:{line}:{column}: {message}")
     }

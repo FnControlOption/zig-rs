@@ -40,6 +40,10 @@ impl<'src> Ast<'src> {
         loc
     }
 
+    pub fn token_len(&self, token_index: TokenIndex) -> ByteOffset {
+        self.token_slice(token_index).len() as ByteOffset
+    }
+
     pub fn token_slice(&self, token_index: TokenIndex) -> &[u8] {
         let token_tag = self.token_tag(token_index);
 
@@ -346,7 +350,7 @@ impl<'src> Ast<'src> {
         loop {
             let n = self.node(index);
             index = match n.tag {
-                N::Root => return self.token_starts.len() as TokenIndex,
+                N::Root => return self.token_starts.len() as TokenIndex - 1,
 
                 N::Usingnamespace
                 | N::BoolNot

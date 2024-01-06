@@ -61,14 +61,24 @@ impl<'src> Ast<'src> {
     pub fn source(&self, range: std::ops::Range<ByteOffset>) -> &[u8] {
         &self.source[range.start as usize..range.end as usize]
     }
+    pub fn source_len(&self) -> ByteOffset {
+        self.source.len() as ByteOffset
+    }
     pub fn token_tag(&self, index: TokenIndex) -> token::Tag {
         self.token_tags[index as usize]
     }
     pub fn token_start(&self, index: TokenIndex) -> ByteOffset {
         self.token_starts[index as usize]
     }
+    pub fn token_count(&self) -> TokenIndex {
+        debug_assert_eq!(self.token_tags.len(), self.token_starts.len());
+        self.token_starts.len() as TokenIndex
+    }
     pub fn node(&self, index: node::Index) -> &Node {
         &self.nodes[index as usize]
+    }
+    pub fn node_count(&self) -> node::Index {
+        self.nodes.len() as node::Index
     }
 
     pub fn parse(source: &'src [u8], mode: Mode) -> Self {
@@ -126,17 +136,15 @@ impl<'src> Ast<'src> {
 
     pub fn root_decls(&self) -> &[node::Index] {
         let root = self.node(0);
-        let start = root.data.lhs as usize;
-        let end = root.data.rhs as usize;
-        &self.extra_data[start..end]
+        self.extra_data(root.data.lhs..root.data.rhs)
     }
 
     pub fn get_node_source(&self, node: node::Index) -> &[u8] {
         let first_token = self.first_token(node);
         let last_token = self.last_token(node);
-        let start = self.token_start(first_token) as usize;
-        let end = self.token_start(last_token) as usize + self.token_slice(last_token).len();
-        &self.source[start..end]
+        let start = self.token_start(first_token);
+        let end = self.token_start(last_token) + self.token_len(last_token);
+        self.source(start..end)
     }
 }
 

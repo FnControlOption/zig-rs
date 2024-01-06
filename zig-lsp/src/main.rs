@@ -13,6 +13,7 @@ use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
+use zig::ast::node;
 use zig::Ast;
 
 mod analysis;
@@ -32,6 +33,7 @@ struct Backend {
     client: Client,
     encoding: Arc<RwLock<PositionEncodingKind>>,
     ast_map: Arc<RwLock<HashMap<Url, Ast<'static>>>>,
+    node_locations_map: Arc<RwLock<HashMap<Url, Vec<offsets::Loc>>>>,
     semantic_tokens_map: Arc<RwLock<HashMap<Url, Vec<SemanticToken>>>>,
 }
 
@@ -41,6 +43,7 @@ impl Backend {
             client,
             encoding: Arc::new(RwLock::new(PositionEncodingKind::UTF16)),
             ast_map: Arc::new(RwLock::new(HashMap::new())),
+            node_locations_map: Arc::new(RwLock::new(HashMap::new())),
             semantic_tokens_map: Arc::new(RwLock::new(HashMap::new())),
         }
     }
@@ -181,16 +184,50 @@ impl LanguageServer for Backend {
         };
 
         let token_index = offsets::source_index_to_token_index(tree, source_index);
+        let token_slice = String::from_utf8_lossy(tree.token_slice(token_index));
 
         let pos_context = analysis::get_position_context(&tree.source, source_index, true);
+
+        let node_index = {
+            let mut map = self.node_locations_map.read().await;
+            map.get(&uri).and_then(|node_locations| {
+                node_locations
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, loc)| loc.start <= source_index && source_index <= loc.end)
+                    .min_by_key(|(_, loc)| loc.end - loc.start)
+                    .map(|(node_index, _)| node_index as node::Index)
+                    .filter(|&node_index| node_index != 0)
+            })
+        };
+
+        let extra = format!("{token_slice:?} {pos_context:?}");
+        let mut value = String::new();
+
+        if let Some(node_index) = node_index {
+            let node_source = String::from_utf8_lossy(tree.get_node_source(node_index));
+            let mut source = node_source;
+            let mut doc = None;
+            if let Some(var_decl) = tree.full_var_decl(node_index) {
+                if var_decl.ast.mut_token == token_index {
+                    doc = Some(match token_slice.as_ref() {
+                        "const" => CONST_DOC,
+                        "var" => VAR_DOC,
+                        _ => unreachable!(),
+                    });
+                    source = token_slice;
+                }
+            }
+            value.push_str(&format!("```zig\n{source}\n```\n\n---\n\n"));
+            doc.map(|s| value.push_str(&format!("{s}\n\n---\n\n")));
+        }
+
+        value.push_str(&extra);
 
         Ok(Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::Markdown,
-                value: format!(
-                    "## You're hovering!\n{:?} {pos_context:?}",
-                    String::from_utf8_lossy(tree.token_slice(token_index))
-                ),
+                value,
             }),
             range: None,
         }))
@@ -213,6 +250,26 @@ impl Backend {
 
         let ast_map = self.ast_map.read().await;
         let tree = ast_map.get(&uri).unwrap();
+
+        {
+            // TODO: use an interval tree or something
+            let mut node_locations = Vec::with_capacity(tree.nodes.len());
+            for node_index in 0..tree.node_count() {
+                let first_token = tree.first_token(node_index);
+                let last_token = tree.last_token(node_index);
+
+                let start = tree.token_start(first_token);
+                let end = tree.token_start(last_token) + tree.token_len(last_token);
+
+                node_locations.push(offsets::Loc {
+                    start: start as usize,
+                    end: end as usize,
+                });
+            }
+
+            let mut map = self.node_locations_map.write().await;
+            map.insert(uri.clone(), node_locations);
+        }
 
         {
             let semantic_tokens = self.get_semantic_tokens(&tree);
@@ -366,3 +423,71 @@ impl Backend {
         visitor.tokens
     }
 }
+
+const CONST_DOC: &str = "Use the `const` keyword to assign a value to an identifier:
+
+```zig
+const x = 1234;
+
+fn foo() void {
+    // It works at file scope as well as inside functions.
+    const y = 5678;
+
+    // Once assigned, an identifier cannot be changed.
+    y += 1;
+}
+
+pub fn main() void {
+    foo();
+}
+```
+
+```sh-session
+$ zig build-exe constant_identifier_cannot_change.zig
+constant_identifier_cannot_change.zig:8:7: error: cannot assign to constant
+    y += 1;
+    ~~^~~~
+referenced by:
+    main: constant_identifier_cannot_change.zig:12:5
+    callMain: /home/ci/actions-runner/_work/zig-bootstrap/out/host/lib/zig/std/start.zig:575:17
+    remaining reference traces hidden; use '-freference-trace' to see all reference traces
+```
+
+`const` applies to all of the bytes that the identifier immediately addresses. Pointers have their own const-ness.";
+
+const VAR_DOC: &str = r#"If you need a variable that you can modify, use the `var` keyword:
+
+```zig
+const print = @import("std").debug.print;
+
+pub fn main() void {
+    var y: i32 = 5678;
+
+    y += 1;
+
+    print("{d}", .{y});
+}
+```
+
+```sh-session
+$ zig build-exe mutable_var.zig
+$ ./mutable_var
+5679
+```
+
+Variables must be initialized:
+
+```zig
+pub fn main() void {
+    var x: i32;
+
+    x = 1;
+}
+```
+
+```sh-session
+$ zig build-exe var_must_be_initialized.zig
+var_must_be_initialized.zig:2:15: error: expected '=', found ';'
+    var x: i32;
+              ^
+```"#;

@@ -117,7 +117,7 @@ pub fn source_index_to_token_index(tree: &Ast, source_index: usize) -> TokenInde
         if upper_index == token_starts.len() - 1 {
             break;
         }
-        let is_within_current_token = source_index > (token_start - 1)
+        let is_within_current_token = (source_index + 1) > token_start
             && source_index < token_starts[upper_index + 1] as usize;
         if !is_within_current_token {
             upper_index += 1;
