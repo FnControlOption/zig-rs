@@ -135,8 +135,8 @@ impl<'src> Ast<'src> {
     }
 
     pub fn root_decls(&self) -> &[node::Index] {
-        let root = self.node(0);
-        self.extra_data(root.data.lhs..root.data.rhs)
+        let node = self.node(0);
+        self.extra_data(node.data.lhs..node.data.rhs)
     }
 
     pub fn get_node_source(&self, node: node::Index) -> &[u8] {

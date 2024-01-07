@@ -22,6 +22,7 @@ fn main() {
     let path = format!("{home}/Documents/zig/{filename}");
     let source = std::fs::read_to_string(&path).unwrap();
     let filename = "-e";
+    let source = r#"const foo;"#;
     let source = r#"const _ = "こんにちは";"#;
     if false {
         let mut tokenizer = Tokenizer::new(source.as_bytes());

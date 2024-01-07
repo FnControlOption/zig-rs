@@ -23,13 +23,26 @@ const ASM_INDENT_DELTA: usize = 2;
 
 #[derive(Default)]
 pub struct Fixups {
+    /// The key is the mut token (`var`/`const`) of the variable declaration
+    /// that should have a `_ = foo;` inserted afterwards.
     unused_var_decls: HashSet<TokenIndex>,
+    /// The functions in this unordered set of AST fn decl nodes will render
+    /// with a function body of `@trap()` instead, with all parameters
+    /// discarded.
     gut_functions: HashSet<node::Index>,
+    /// These global declarations will be omitted.
     omit_nodes: HashSet<node::Index>,
+    /// These expressions will be replaced with the string value.
     replace_nodes_with_string: HashMap<node::Index, Vec<u8>>,
+    /// The string value will be inserted directly after the node.
     append_string_after_node: HashMap<node::Index, Vec<u8>>,
+    /// These nodes will be replaced with a different node.
     replace_nodes_with_node: HashMap<node::Index, node::Index>,
+    /// Change all identifier names matching the key to be value instead.
     rename_identifiers: HashMap<Vec<u8>, Vec<u8>>,
+
+    /// All `@import` builtin calls which refer to a file path will be prefixed
+    /// with this path.
     rebase_imported_paths: Option<Vec<u8>>,
 }
 
@@ -172,11 +185,219 @@ impl Render<'_, '_, '_> {
 
     /// Render all expressions in the slice, keeping empty lines where appropriate
     fn render_expressions(&mut self, expressions: &[node::Index], space: Space) -> Result<()> {
-        todo!("render_expressions")
+        let [first, rest @ ..] = expressions else {
+            return Ok(());
+        };
+        self.render_expression(*first, space)?;
+        for &expression in rest {
+            self.render_extra_newline(expression)?;
+            self.render_expression(expression, space)?;
+        }
+        Ok(())
     }
 
     fn render_expression(&mut self, node: node::Index, space: Space) -> Result<()> {
-        todo!("render_expression")
+        if let Some(replacement) = self.fixups.replace_nodes_with_string.get(&node) {
+            self.ais.write_all(replacement)?;
+            return self.render_only_space(space);
+        } else if let Some(&replacement) = self.fixups.replace_nodes_with_node.get(&node) {
+            return self.render_expression(replacement, space);
+        }
+        match self.tree.node(node).tag {
+            N::Identifier => {
+                let token_index = self.tree.node(node).main_token;
+                self.render_identifier(token_index, space, QuoteBehavior::PreserveWhenShadowing)
+            }
+
+            N::NumberLiteral
+            | N::CharLiteral
+            | N::UnreachableLiteral
+            | N::AnyframeLiteral
+            | N::StringLiteral => self.render_token(self.tree.node(node).main_token, space),
+
+            N::MultilineStringLiteral => todo!("render_expression"),
+
+            N::ErrorValue => todo!("render_expression"),
+
+            N::BlockTwo | N::BlockTwoSemicolon => todo!("render_expression"),
+            N::Block | N::BlockSemicolon => todo!("render_expression"),
+
+            N::Errdefer => todo!("render_expression"),
+
+            N::Defer => todo!("render_expression"),
+            N::Comptime | N::Nosuspend => todo!("render_expression"),
+
+            N::Suspend => todo!("render_expression"),
+
+            N::Catch => todo!("render_expression"),
+
+            N::FieldAccess => todo!("render_expression"),
+
+            N::ErrorUnion | N::SwitchRange => todo!("render_expression"),
+            N::ForRange => todo!("render_expression"),
+
+            N::Add
+            | N::AddWrap
+            | N::AddSat
+            | N::ArrayCat
+            | N::ArrayMult
+            | N::Assign
+            | N::AssignBitAnd
+            | N::AssignBitOr
+            | N::AssignShl
+            | N::AssignShlSat
+            | N::AssignShr
+            | N::AssignBitXor
+            | N::AssignDiv
+            | N::AssignSub
+            | N::AssignSubWrap
+            | N::AssignSubSat
+            | N::AssignMod
+            | N::AssignAdd
+            | N::AssignAddWrap
+            | N::AssignAddSat
+            | N::AssignMul
+            | N::AssignMulWrap
+            | N::AssignMulSat
+            | N::BangEqual
+            | N::BitAnd
+            | N::BitOr
+            | N::Shl
+            | N::ShlSat
+            | N::Shr
+            | N::BitXor
+            | N::BoolAnd
+            | N::BoolOr
+            | N::Div
+            | N::EqualEqual
+            | N::GreaterOrEqual
+            | N::GreaterThan
+            | N::LessOrEqual
+            | N::LessThan
+            | N::MergeErrorSets
+            | N::Mod
+            | N::Mul
+            | N::MulWrap
+            | N::MulSat
+            | N::Sub
+            | N::SubWrap
+            | N::SubSat
+            | N::Orelse => todo!("render_expression"),
+
+            N::AssignDestructure => todo!("render_expression"),
+
+            N::BitNot
+            | N::BoolNot
+            | N::Negation
+            | N::NegationWrap
+            | N::OptionalType
+            | N::AddressOf => todo!("render_expression"),
+
+            N::Try | N::Resume | N::Await => todo!("render_expression"),
+
+            N::ArrayType | N::ArrayTypeSentinel => todo!("render_expression"),
+
+            N::PtrTypeAligned | N::PtrTypeSentinel | N::PtrType | N::PtrTypeBitRange => {
+                todo!("render_expression")
+            }
+
+            N::ArrayInitOne
+            | N::ArrayInitOneComma
+            | N::ArrayInitDotTwo
+            | N::ArrayInitDotTwoComma
+            | N::ArrayInitDot
+            | N::ArrayInitDotComma
+            | N::ArrayInit
+            | N::ArrayInitComma => todo!("render_expression"),
+
+            N::StructInitOne
+            | N::StructInitOneComma
+            | N::StructInitDotTwo
+            | N::StructInitDotTwoComma
+            | N::StructInitDot
+            | N::StructInitDotComma
+            | N::StructInit
+            | N::StructInitComma => todo!("render_expression"),
+
+            N::CallOne
+            | N::CallOneComma
+            | N::AsyncCallOne
+            | N::AsyncCallOneComma
+            | N::Call
+            | N::CallComma
+            | N::AsyncCall
+            | N::AsyncCallComma => todo!("render_expression"),
+
+            N::ArrayAccess => todo!("render_expression"),
+
+            N::SliceOpen | N::Slice | N::SliceSentinel => todo!("render_expression"),
+
+            N::Deref => todo!("render_expression"),
+
+            N::UnwrapOptional => todo!("render_expression"),
+
+            N::Break => todo!("render_expression"),
+
+            N::Continue => todo!("render_expression"),
+
+            N::Return => todo!("render_expression"),
+
+            N::GroupedExpression => todo!("render_expression"),
+
+            N::ContainerDecl
+            | N::ContainerDeclTrailing
+            | N::ContainerDeclArg
+            | N::ContainerDeclArgTrailing
+            | N::ContainerDeclTwo
+            | N::ContainerDeclTwoTrailing
+            | N::TaggedUnion
+            | N::TaggedUnionTrailing
+            | N::TaggedUnionEnumTag
+            | N::TaggedUnionEnumTagTrailing
+            | N::TaggedUnionTwo
+            | N::TaggedUnionTwoTrailing => todo!("render_expression"),
+
+            N::ErrorSetDecl => todo!("render_expression"),
+
+            N::BuiltinCallTwo | N::BuiltinCallTwoComma => todo!("render_expression"),
+            N::BuiltinCall | N::BuiltinCallComma => todo!("render_expression"),
+
+            N::FnProtoSimple | N::FnProtoMulti | N::FnProtoOne | N::FnProto => {
+                todo!("render_expression")
+            }
+
+            N::AnyframeType => todo!("render_expression"),
+
+            N::Switch | N::SwitchComma => todo!("render_expression"),
+
+            N::SwitchCaseOne | N::SwitchCaseInlineOne | N::SwitchCase | N::SwitchCaseInline => {
+                todo!("render_expression")
+            }
+
+            N::WhileSimple | N::WhileCont | N::While => todo!("render_expression"),
+
+            N::ForSimple | N::For => todo!("render_expression"),
+
+            N::IfSimple | N::If => todo!("render_expression"),
+
+            N::AsmSimple | N::Asm => todo!("render_expression"),
+
+            N::EnumLiteral => todo!("render_expression"),
+
+            N::FnDecl => unreachable!(),
+            N::ContainerField => unreachable!(),
+            N::ContainerFieldInit => unreachable!(),
+            N::ContainerFieldAlign => unreachable!(),
+            N::Root => unreachable!(),
+            N::GlobalVarDecl => unreachable!(),
+            N::LocalVarDecl => unreachable!(),
+            N::SimpleVarDecl => unreachable!(),
+            N::AlignedVarDecl => unreachable!(),
+            N::Usingnamespace => unreachable!(),
+            N::TestDecl => unreachable!(),
+            N::AsmOutput => unreachable!(),
+            N::AsmInput => unreachable!(),
+        }
     }
 
     /// Same as `renderExpression`, but afterwards looks for any
@@ -238,11 +459,111 @@ impl Render<'_, '_, '_> {
         // `comma_space` and `space` are used for destructure LHS decls.
         space: Space,
     ) -> Result<()> {
-        todo!("render_var_decl_without_fixups")
+        if let Some(visib_token) = var_decl.visib_token {
+            self.render_token(visib_token, Space::Space)?; // pub
+        }
+
+        if let Some(extern_export_token) = var_decl.extern_export_token {
+            self.render_token(extern_export_token, Space::Space)?; // extern
+
+            if let Some(lib_name) = var_decl.lib_name {
+                self.render_token(lib_name, Space::Space)?; // "lib"
+            }
+        }
+
+        if let Some(threadlocal_token) = var_decl.threadlocal_token {
+            self.render_token(threadlocal_token, Space::Space)?; // threadlocal
+        }
+
+        if !ignore_comptime_token {
+            if let Some(comptime_token) = var_decl.comptime_token {
+                self.render_token(comptime_token, Space::Space)?; // comptime
+            }
+        }
+
+        self.render_token(var_decl.ast.mut_token, Space::Space)?; // var
+
+        if var_decl.ast.type_node != 0
+            || var_decl.ast.align_node != 0
+            || var_decl.ast.addrspace_node != 0
+            || var_decl.ast.section_node != 0
+            || var_decl.ast.init_node != 0
+        {
+            let name_space = if var_decl.ast.type_node == 0
+                && (var_decl.ast.align_node != 0
+                    || var_decl.ast.addrspace_node != 0
+                    || var_decl.ast.section_node != 0
+                    || var_decl.ast.init_node != 0)
+            {
+                Space::Space
+            } else {
+                Space::None
+            };
+
+            self.render_identifier(
+                var_decl.ast.mut_token + 1,
+                name_space,
+                QuoteBehavior::PreserveWhenShadowing,
+            )?; // name
+        } else {
+            return self.render_identifier(
+                var_decl.ast.mut_token + 1,
+                space,
+                QuoteBehavior::PreserveWhenShadowing,
+            ); // name
+        }
+
+        if var_decl.ast.type_node != 0 {
+            todo!("render_var_decl_without_fixups")
+        }
+
+        if var_decl.ast.align_node != 0 {
+            todo!("render_var_decl_without_fixups")
+        }
+
+        if var_decl.ast.addrspace_node != 0 {
+            todo!("render_var_decl_without_fixups")
+        }
+
+        if var_decl.ast.section_node != 0 {
+            todo!("render_var_decl_without_fixups")
+        }
+
+        debug_assert_ne!(var_decl.ast.init_node, 0);
+
+        let eq_token = self.tree.first_token(var_decl.ast.init_node) - 1;
+        let eq_space = if self.tree.tokens_on_same_line(eq_token, eq_token + 1) {
+            Space::Space
+        } else {
+            Space::Newline
+        };
+        {
+            self.ais.push_indent();
+            self.render_token(eq_token, eq_space)?;
+            self.ais.pop_indent();
+        }
+        self.ais.push_indent_one_shot();
+        self.render_expression(var_decl.ast.init_node, space)
     }
 
     fn render_if(&mut self, if_node: full::If, space: Space) -> Result<()> {
-        todo!("render_if")
+        self.render_while(
+            full::While {
+                ast: full::WhileComponents {
+                    while_token: if_node.ast.if_token,
+                    cond_expr: if_node.ast.cond_expr,
+                    cont_expr: 0,
+                    then_expr: if_node.ast.then_expr,
+                    else_expr: if_node.ast.else_expr,
+                },
+                inline_token: None,
+                label_token: None,
+                payload_token: if_node.payload_token,
+                error_token: if_node.error_token,
+                else_token: if_node.else_token,
+            },
+            space,
+        )
     }
 
     /// Note that this function is additionally used to render if expressions, with
@@ -299,7 +620,22 @@ impl Render<'_, '_, '_> {
         statements: &[node::Index],
         space: Space,
     ) -> Result<()> {
-        todo!("render_block")
+        let lbrace = self.tree.node(block_node).main_token;
+
+        if self.tree.token_tag(lbrace - 1) == T::Colon
+            && self.tree.token_tag(lbrace - 2) == T::Identifier
+        {
+            self.render_identifier(lbrace - 2, Space::None, QuoteBehavior::EagerlyUnquote)?; // identifier
+            self.render_token(lbrace - 1, Space::Space)?; // :
+        }
+        self.ais.push_indent_next_line();
+        if statements.is_empty() {
+            self.render_token(lbrace, Space::None)?;
+            self.ais.pop_indent();
+            return self.render_token(self.tree.last_token(block_node), space); // rbrace
+        }
+        self.render_token(lbrace, Space::Newline)?;
+        self.finish_render_block(block_node, statements, space)
     }
 
     fn finish_render_block(
@@ -308,7 +644,25 @@ impl Render<'_, '_, '_> {
         statements: &[node::Index],
         space: Space,
     ) -> Result<()> {
-        todo!("finish_render_block")
+        for (i, &stmt) in statements.iter().enumerate() {
+            if i != 0 {
+                self.render_extra_newline(stmt)?;
+            }
+            if self.fixups.omit_nodes.contains(&stmt) {
+                continue;
+            }
+            match self.tree.node(stmt).tag {
+                N::GlobalVarDecl | N::LocalVarDecl | N::SimpleVarDecl | N::AlignedVarDecl => {
+                    let var_decl = self.tree.full_var_decl(stmt).unwrap();
+                    self.render_var_decl(var_decl, false, Space::Semicolon)?;
+                }
+
+                _ => self.render_expression(stmt, Space::Semicolon)?,
+            }
+        }
+        self.ais.pop_indent();
+
+        self.render_token(self.tree.last_token(block_node), space) // rbrace
     }
 
     fn render_struct_init(
@@ -338,7 +692,11 @@ impl Render<'_, '_, '_> {
     }
 
     fn render_call(&mut self, call: full::Call, space: Space) -> Result<()> {
-        todo!("render_call")
+        if let Some(async_token) = call.async_token {
+            self.render_token(async_token, Space::Space)?;
+        }
+        self.render_expression(call.ast.fn_expr, Space::None)?;
+        self.render_param_list(call.ast.lparen, call.ast.params, space)
     }
 
     fn render_param_list(
@@ -359,13 +717,25 @@ impl Render<'_, '_, '_> {
     /// Render an expression, and the comma that follows it, if it is present in the source.
     /// If a comma is present, and `space` is `Space.comma`, render only a single comma.
     fn render_expression_comma(&mut self, node: node::Index, space: Space) -> Result<()> {
-        todo!("render_expression_comma")
+        let maybe_comma = self.tree.last_token(node) + 1;
+        if self.tree.token_tag(maybe_comma) == T::Comma && space != Space::Comma {
+            self.render_expression(node, Space::None)?;
+            self.render_token(maybe_comma, space)
+        } else {
+            self.render_expression(node, space)
+        }
     }
 
     /// Render a token, and the comma that follows it, if it is present in the source.
     /// If a comma is present, and `space` is `Space.comma`, render only a single comma.
     fn render_token_comma(&mut self, token: TokenIndex, space: Space) -> Result<()> {
-        todo!("render_token_comma")
+        let maybe_comma = token + 1;
+        if self.tree.token_tag(maybe_comma) == T::Comma && space != Space::Comma {
+            self.render_token(token, Space::None)?;
+            self.render_token(maybe_comma, space)
+        } else {
+            self.render_token(token, space)
+        }
     }
 
     /// Render an identifier, and the comma that follows it, if it is present in the source.
@@ -376,11 +746,19 @@ impl Render<'_, '_, '_> {
         space: Space,
         quote: QuoteBehavior,
     ) -> Result<()> {
-        todo!("render_identifier_comma")
+        let maybe_comma = token + 1;
+        if self.tree.token_tag(maybe_comma) == T::Comma && space != Space::Comma {
+            self.render_identifier(token, Space::None, quote)?;
+            self.render_token(maybe_comma, space)
+        } else {
+            self.render_identifier(token, space, quote)
+        }
     }
 
     fn render_token(&mut self, token_index: TokenIndex, space: Space) -> Result<()> {
-        todo!("render_token")
+        let lexeme = token_slice_for_render(self.tree, token_index);
+        self.ais.write_all(lexeme)?;
+        self.render_space(token_index, lexeme.len(), space)
     }
 
     fn render_space(
@@ -389,14 +767,67 @@ impl Render<'_, '_, '_> {
         lexeme_len: usize,
         space: Space,
     ) -> Result<()> {
-        todo!("render_space")
+        if matches!(space, Space::Skip) {
+            return Ok(());
+        }
+
+        let token_start = self.tree.token_start(token_index);
+
+        if matches!(space, Space::Comma) && self.tree.token_tag(token_index + 1) != T::Comma {
+            write!(self.ais, ",")?;
+        }
+
+        let comment = self.render_comments(
+            token_start as usize + lexeme_len,
+            self.tree.token_start(token_index + 1) as usize,
+        )?;
+        match space {
+            Space::None => {}
+            Space::Space => {
+                if !comment {
+                    write!(self.ais, " ")?;
+                }
+            }
+            Space::Newline => {
+                if !comment {
+                    self.ais.insert_newline()?;
+                }
+            }
+
+            Space::Comma => {
+                if self.tree.token_tag(token_index + 1) == T::Comma {
+                    self.render_token(token_index + 1, Space::Newline)?;
+                } else if !comment {
+                    self.ais.insert_newline()?;
+                }
+            }
+
+            Space::CommaSpace => {
+                if self.tree.token_tag(token_index + 1) == T::Comma {
+                    self.render_token(token_index + 1, Space::Space)?;
+                } else if !comment {
+                    write!(self.ais, " ")?;
+                }
+            }
+
+            Space::Semicolon => {
+                if self.tree.token_tag(token_index + 1) == T::Semicolon {
+                    self.render_token(token_index + 1, Space::Newline)?;
+                } else if !comment {
+                    self.ais.insert_newline()?;
+                }
+            }
+
+            Space::Skip => unreachable!(),
+        }
+        Ok(())
     }
 
     fn render_only_space(&mut self, space: Space) -> Result<()> {
         match space {
             Space::None => Ok(()),
             Space::Space => write!(self.ais, " "),
-            Space::Newline => self.ais.insert_new_line(),
+            Space::Newline => self.ais.insert_newline(),
             Space::Comma => write!(self.ais, ",\n"),
             Space::CommaSpace => write!(self.ais, ", "),
             Space::Semicolon => write!(self.ais, ";\n"),
@@ -582,12 +1013,12 @@ impl Render<'_, '_, '_> {
                     && utils::contains_at_least(&self.tree.source[index..comment_start], 2, b"\n")
                 {
                     // Leave up to one empty line before the first comment
-                    self.ais.insert_new_line()?;
-                    self.ais.insert_new_line()?;
+                    self.ais.insert_newline()?;
+                    self.ais.insert_newline()?;
                 } else if utils::contains(&self.tree.source[index..comment_start], b"\n") {
                     // Respect the newline directly before the comment.
                     // Note: This allows an empty line between comments
-                    self.ais.insert_new_line()?;
+                    self.ais.insert_newline()?;
                 } else if index == start {
                     // Otherwise if the first comment is on the same line as
                     // the token before it, prefix it with a single space.
@@ -627,7 +1058,7 @@ impl Render<'_, '_, '_> {
         if index != start && utils::contains_at_least(&self.tree.source[index - 1..end], 2, b"\n") {
             // Don't leave any whitespace at the end of the file
             if end != self.tree.source.len() {
-                self.ais.insert_new_line()?;
+                self.ais.insert_newline()?;
             }
         }
 
@@ -670,7 +1101,7 @@ impl Render<'_, '_, '_> {
                 newlines += 1;
             }
             if newlines == 2 {
-                return self.ais.insert_new_line();
+                return self.ais.insert_newline();
             }
             if i == prev_token_end {
                 break;
@@ -1056,7 +1487,7 @@ impl AutoIndentingStream<'_> {
         Ok(bytes.len())
     }
 
-    fn insert_new_line(&mut self) -> Result<()> {
+    fn insert_newline(&mut self) -> Result<()> {
         self.write_no_indent(b"\n")?;
         Ok(())
     }
@@ -1069,7 +1500,7 @@ impl AutoIndentingStream<'_> {
     /// Insert a newline unless the current line is blank
     fn maybe_insert_newline(&mut self) -> Result<()> {
         if !self.current_line_empty {
-            self.insert_new_line()?;
+            self.insert_newline()?;
         }
         Ok(())
     }
