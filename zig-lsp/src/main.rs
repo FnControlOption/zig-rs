@@ -13,10 +13,16 @@ use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
-use zig::ast::node;
+use zig::ast::node::Tag as N;
+use zig::ast::{node, GetExtraData, TokenIndex};
+use zig::token::Tag as T;
 use zig::Ast;
 
+use crate::analysis::PositionContext;
+use crate::hover::*;
+
 mod analysis;
+mod hover;
 mod offsets;
 
 #[tokio::main]
@@ -183,10 +189,8 @@ impl LanguageServer for Backend {
             offsets::position_to_index(&tree.source, position, &encoding)
         };
 
-        let token_index = offsets::source_index_to_token_index(tree, source_index);
-        let token_slice = String::from_utf8_lossy(tree.token_slice(token_index));
-
         let pos_context = analysis::get_position_context(&tree.source, source_index, true);
+        let token_index = offsets::source_index_to_token_index(tree, source_index);
 
         let node_index = {
             let mut map = self.node_locations_map.read().await;
@@ -201,28 +205,13 @@ impl LanguageServer for Backend {
             })
         };
 
-        let extra = format!("{token_slice:?} {pos_context:?}");
-        let mut value = String::new();
+        let token_slice = String::from_utf8_lossy(tree.token_slice(token_index));
+        let node_tag = node_index.map(|n| tree.node(n).tag);
+        let extra = format!("{node_tag:?} {token_slice:?} {pos_context:?}");
 
-        if let Some(node_index) = node_index {
-            let node_source = String::from_utf8_lossy(tree.get_node_source(node_index));
-            let mut source = node_source;
-            let mut doc = None;
-            if let Some(var_decl) = tree.full_var_decl(node_index) {
-                if var_decl.ast.mut_token == token_index {
-                    doc = Some(match token_slice.as_ref() {
-                        "const" => CONST_DOC,
-                        "var" => VAR_DOC,
-                        _ => unreachable!(),
-                    });
-                    source = token_slice;
-                }
-            }
-            value.push_str(&format!("```zig\n{source}\n```\n\n---\n\n"));
-            doc.map(|s| value.push_str(&format!("{s}\n\n---\n\n")));
-        }
-
-        value.push_str(&extra);
+        let value = node_index
+            .and_then(|n| get_tooltip(tree, pos_context, token_index, n))
+            .unwrap_or_else(|| format!("## {extra}"));
 
         Ok(Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
@@ -382,10 +371,10 @@ impl Backend {
         impl Visitor for SemanticVisitor<'_> {
             fn visit(&mut self, tree: &Ast, node: &Node) -> bool {
                 match node.tag {
-                    node::Tag::GlobalVarDecl
-                    | node::Tag::LocalVarDecl
-                    | node::Tag::SimpleVarDecl
-                    | node::Tag::AlignedVarDecl => 'blk: {
+                    N::GlobalVarDecl
+                    | N::LocalVarDecl
+                    | N::SimpleVarDecl
+                    | N::AlignedVarDecl => 'blk: {
                         if node.data.rhs == 0 {
                             break 'blk;
                         }
@@ -395,16 +384,16 @@ impl Backend {
                         let init_token = tree.token_tag(init_node.main_token);
 
                         match init_node.tag {
-                            node::Tag::ContainerDecl
-                            | node::Tag::ContainerDeclTrailing
-                            | node::Tag::ContainerDeclTwo
-                            | node::Tag::ContainerDeclTwoTrailing
-                            | node::Tag::ContainerDeclArg
-                            | node::Tag::ContainerDeclArgTrailing => match init_token {
-                                token::Tag::KeywordStruct
-                                | token::Tag::KeywordUnion
-                                | token::Tag::KeywordOpaque
-                                | token::Tag::KeywordEnum => {
+                            N::ContainerDecl
+                            | N::ContainerDeclTrailing
+                            | N::ContainerDeclTwo
+                            | N::ContainerDeclTwoTrailing
+                            | N::ContainerDeclArg
+                            | N::ContainerDeclArgTrailing => match init_token {
+                                T::KeywordStruct
+                                | T::KeywordUnion
+                                | T::KeywordOpaque
+                                | T::KeywordEnum => {
                                     self.push_token(tree, name_token, semantic_tokens::TYPE);
                                 }
                                 _ => {}
@@ -423,71 +412,3 @@ impl Backend {
         visitor.tokens
     }
 }
-
-const CONST_DOC: &str = "Use the `const` keyword to assign a value to an identifier:
-
-```zig
-const x = 1234;
-
-fn foo() void {
-    // It works at file scope as well as inside functions.
-    const y = 5678;
-
-    // Once assigned, an identifier cannot be changed.
-    y += 1;
-}
-
-pub fn main() void {
-    foo();
-}
-```
-
-```sh-session
-$ zig build-exe constant_identifier_cannot_change.zig
-constant_identifier_cannot_change.zig:8:7: error: cannot assign to constant
-    y += 1;
-    ~~^~~~
-referenced by:
-    main: constant_identifier_cannot_change.zig:12:5
-    callMain: /home/ci/actions-runner/_work/zig-bootstrap/out/host/lib/zig/std/start.zig:575:17
-    remaining reference traces hidden; use '-freference-trace' to see all reference traces
-```
-
-`const` applies to all of the bytes that the identifier immediately addresses. Pointers have their own const-ness.";
-
-const VAR_DOC: &str = r#"If you need a variable that you can modify, use the `var` keyword:
-
-```zig
-const print = @import("std").debug.print;
-
-pub fn main() void {
-    var y: i32 = 5678;
-
-    y += 1;
-
-    print("{d}", .{y});
-}
-```
-
-```sh-session
-$ zig build-exe mutable_var.zig
-$ ./mutable_var
-5679
-```
-
-Variables must be initialized:
-
-```zig
-pub fn main() void {
-    var x: i32;
-
-    x = 1;
-}
-```
-
-```sh-session
-$ zig build-exe var_must_be_initialized.zig
-var_must_be_initialized.zig:2:15: error: expected '=', found ';'
-    var x: i32;
-              ^
-```"#;
